@@ -1,0 +1,11 @@
+# macOS system file
+.DS_Store
+
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/
+
+# Virtual environment directory
+influence_env/
+
+# Specific backup script file
+main_vision_label_noise_backup.py
