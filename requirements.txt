@@ -6,7 +6,7 @@ pandas==2.3.0
 Pillow==11.2.1
 scikit_learn==1.7.0
 scipy==1.15.3
-tab_transformer_pytorch==0.4.2
-torch==2.7.1
-torchvision==0.22.1
+torch==2.2.2
+tab-transformer-pytorch==0.3.0
+torchvision==0.17.2
 vit_pytorch==1.10.1
