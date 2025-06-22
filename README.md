@@ -10,7 +10,7 @@ Code using Python version 3.11.5
 
 # Run
 - Go to project directory on your console (Terminal for mac)
-> cd {Drag and Drop PrecisionMedicine folder onto Terminal}
+> cd {Drag and Drop project folder onto Terminal}
 - Run project virtual environment if you chose to set one up
 > source influence_env/bin/activate
 - Start notebook as usual
