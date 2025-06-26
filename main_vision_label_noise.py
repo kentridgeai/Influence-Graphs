@@ -184,6 +184,7 @@ def prerequisites():
 DEVICE = None
 
 if __name__ == "__main__":
+    
     ############################## Argument Parser ##############################
     parser = argparse.ArgumentParser(description="Run influence estimation with label noise")
     parser.add_argument('--dataset', type=str, default='MNIST', help='Dataset name')
@@ -241,9 +242,11 @@ if __name__ == "__main__":
                 'clipping' :          False,
                 'intraclass_only' :   True,
                 'negative_clipping':  False,
+                'clip_outliers':      False,
                 'mode':               'mean', # For InfluenceGraphv3
                 'gradient_lr':        0.1, # For InfluenceGraphv3
-                'dtype':              np.float16,
+                # 'dtype':              np.float16,
+                'dtype':              np.float32,
                 'graph_type':         InfluenceGraphv4,
                 }
             
@@ -265,7 +268,8 @@ if __name__ == "__main__":
                 'type':                'batch', # batch or representative
                 'training_iterations': train_params['total_epochs'],
                 'intraclass_only':     True,
-                'dtype':               np.float16
+                # 'dtype':               np.float16
+                'dtype':              np.float32,
                 }
             
             influence_GT_train_params = {

@@ -24,8 +24,6 @@ model = FTTransformer(
 )
 
 
-
-
 cont_mean_std = torch.randn(10, 2)
 
 model = TabTransformer(

@@ -8,8 +8,6 @@ import numpy  as np
 import torch
 
 
-
-
 def rank_convert_data(data):
     
     for i in range(data.shape[1]):
@@ -18,6 +16,7 @@ def rank_convert_data(data):
         # dataset.data = dataset.data
     
     return data
+
 
 def uniform_convert_data(data,params=None):
     if params == None:

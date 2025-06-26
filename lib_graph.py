@@ -58,7 +58,6 @@ class InfluenceGraph:
         self.graph_counts = self.graph_counts + count_mat
         
         
-        
     def update_influence_graph(self, batch_indices, batch_lossdiff, train_lossdiff):
         
         # Default params: class_normalize = False, remove_negatives = False, clipping = True, intraclass_only = True
@@ -76,7 +75,6 @@ class InfluenceGraph:
             class_normalizer = len(batch_indices)
         else:
             class_normalizer = 1
-            
         
         if self.intraclass_only:
             batchlabel_mat = np.tile(np.expand_dims(self.node_labels[batch_indices],1), (1, self.node_size))
@@ -84,9 +82,7 @@ class InfluenceGraph:
             labeleq_mat = batchlabel_mat == reflabel_mat
             mask_mat = mask_mat * labeleq_mat 
         
-            
         weights_vec = train_lossdiff # old - new
-        
         
         if self.remove_negatives:
             weights_vec = weights_vec * (weights_vec>0)
@@ -104,12 +100,15 @@ class InfluenceGraph:
         if self.negative_clipping:
             weights_mat[weights_mat<-1] = -1
         
-        
         locations_temp = self.locations[mask_mat==1,:]
         weights_flat = weights_mat[mask_mat==1]
         
-        self.update_graph_mat_oneshot(batch_indices[locations_temp[:,0]],locations_temp[:,1],
-                                      weights_flat, class_normalizer)
+        self.update_graph_mat_oneshot(
+            batch_indices[locations_temp[:,0]],
+            locations_temp[:,1],
+            weights_flat,
+            class_normalizer
+        )
         
         
     def store_graph(self,folder,loader_params,influence_params,train_params):
@@ -117,7 +116,6 @@ class InfluenceGraph:
         if not os.path.exists(folder):
             os.makedirs(folder)
         os.chdir(folder)
-        
         
         newpath = loader_params['dataset_name'] 
                            
@@ -134,7 +132,6 @@ class InfluenceGraph:
         
         os.chdir('..')
         os.chdir('..')
-        
         return
     
     def load_graph(self,folder, dataset_name,ID):
@@ -156,7 +153,6 @@ class InfluenceGraph:
 
 
 
-
 class InfluenceGraphv2: # Difference in difference based approaches 
 
     def __init__(self, node_size,node_labels,batch_update_size, influence_params):
@@ -172,7 +168,6 @@ class InfluenceGraphv2: # Difference in difference based approaches
         self.clipping = influence_params['clipping']
         self.intraclass_only = influence_params['intraclass_only']
         self.negative_clipping = influence_params['negative_clipping']
-        
         
         # self.C0 = 1+(float(batch_update_size - 1)/float(node_size - (2*batch_update_size)))
         # self.C1 = float((batch_update_size - 1)*(node_size - batch_update_size))/float(batch_update_size*(node_size- (2*batch_update_size)))
@@ -205,7 +200,6 @@ class InfluenceGraphv2: # Difference in difference based approaches
         self.normgraph_mat = self.normgraph_mat - passive_mat
         # self.normgraph_mat = self.normgraph_mat.multiply(active_mat.power(-1.))
         
-        
         return self.normgraph_mat
 
         
@@ -219,7 +213,6 @@ class InfluenceGraphv2: # Difference in difference based approaches
 
         self.influence_sum  = self.influence_sum + lossdiff_mat
         self.influence_counts = self.influence_counts + count_mat
-        
         
         
     def update_influence_graph(self, batch_indices, batch_lossdiff, train_lossdiff):
@@ -240,7 +233,6 @@ class InfluenceGraphv2: # Difference in difference based approaches
         else:
             class_normalizer = 1
             
-        
         if self.intraclass_only:
             batchlabel_mat = np.tile(np.expand_dims(self.node_labels[batch_indices],1), (1, self.node_size))
             reflabel_mat = np.tile(self.node_labels, (len(batch_indices),1))
@@ -248,7 +240,6 @@ class InfluenceGraphv2: # Difference in difference based approaches
             mask_mat = mask_mat * labeleq_mat 
         
             # old - new
-        
         
         if self.remove_negatives:
             train_lossdiff = train_lossdiff * (train_lossdiff>0)
@@ -265,7 +256,6 @@ class InfluenceGraphv2: # Difference in difference based approaches
         if self.negative_clipping:
             trainlossdiff_mat[trainlossdiff_mat<-1] = -1
         
-        
         locations_temp = self.locations[mask_mat==1,:]
         trainlossdiff_flat = self.C0*trainlossdiff_mat[mask_mat==1]
         
@@ -278,10 +268,12 @@ class InfluenceGraphv2: # Difference in difference based approaches
         # print(np.mean(batch_lossdiff>=0))
         self.activeloss_counts[batch_indices] = self.activeloss_counts[batch_indices] + 1
         
-        
-        
-        self.update_graph_mat_oneshot(batch_indices[locations_temp[:,0]],locations_temp[:,1],
-                                      trainlossdiff_flat, class_normalizer)
+        self.update_graph_mat_oneshot(
+            batch_indices[locations_temp[:,0]],
+            locations_temp[:,1],
+            trainlossdiff_flat,
+            class_normalizer
+        )
         
         
     def store_graph(self,folder,loader_params,influence_params,train_params):
@@ -289,7 +281,6 @@ class InfluenceGraphv2: # Difference in difference based approaches
         if not os.path.exists(folder):
             os.makedirs(folder)
         os.chdir(folder)
-        
         
         newpath = loader_params['dataset_name'] 
                            
@@ -373,7 +364,6 @@ class InfluenceGraphv3: # Gradient descent based approaches
         self.graph_counts = self.graph_counts + count_mat
         
         
-        
     def update_influence_graph(self, batch_indices, batch_lossdiff, train_lossdiff):
         
         # Default params: class_normalize = False, remove_negatives = False, clipping = True, intraclass_only = True
@@ -398,8 +388,7 @@ class InfluenceGraphv3: # Gradient descent based approaches
             reflabel_mat = np.tile(self.node_labels, (len(batch_indices),1))
             labeleq_mat = batchlabel_mat == reflabel_mat
             mask_mat = mask_mat * labeleq_mat 
-        
-            
+
         
         if self.remove_negatives:
             train_lossdiff = train_lossdiff * (train_lossdiff>0)
@@ -416,7 +405,6 @@ class InfluenceGraphv3: # Gradient descent based approaches
             print(np.abs(err_mat).mean()/np.abs(lossdiff_mat).mean())
             
             weights_mat =  2*self.gradient_lr*err_mat*batchlossdiff_mat/float(len(batch_indices))
-            
             
         elif self.mode =='mean':
             squared_lossdiff_batch = np.sum(batch_lossdiff**2)
@@ -442,7 +430,6 @@ class InfluenceGraphv3: # Gradient descent based approaches
         if not os.path.exists(folder):
             os.makedirs(folder)
         os.chdir(folder)
-        
         
         newpath = loader_params['dataset_name'] 
                            
@@ -481,7 +468,6 @@ class InfluenceGraphv3: # Gradient descent based approaches
         
     
     
-    
 class InfluenceGraphv4: # 2nd order approaches (Correlation Based)
 
     def __init__(self, node_size,node_labels,batch_update_size, influence_params, transform_params=None):
@@ -499,22 +485,19 @@ class InfluenceGraphv4: # 2nd order approaches (Correlation Based)
         self.intraclass_only = influence_params['intraclass_only']
         self.negative_clipping = influence_params['negative_clipping']
         
-        
         row = np.array([0])
         col = np.array([0])
         data = np.array([0],dtype = influence_params['dtype'])
-        self.lossmult_sum = csr_matrix((data, (row, col)), shape = (node_size,node_size))
-        self.passive_sum = csr_matrix((data, (row, col)), shape = (node_size,node_size))
-        self.passive_square_sum = csr_matrix((data, (row, col)), shape = (node_size,node_size))
-        self.active_sum =  csr_matrix((data, (row, col)), shape = (node_size,node_size))
-        self.active_square_sum = csr_matrix((data, (row, col)), shape = (node_size,node_size))
+        self.lossmult_sum = csr_matrix((data, (row, col)), shape = (node_size, node_size))
+        self.passive_sum = csr_matrix((data, (row, col)), shape = (node_size, node_size))
+        self.passive_square_sum = csr_matrix((data, (row, col)), shape = (node_size, node_size))
+        self.active_sum =  csr_matrix((data, (row, col)), shape = (node_size, node_size))
+        self.active_square_sum = csr_matrix((data, (row, col)), shape = (node_size, node_size))
 
         self.lossmult_counts = csr_matrix((data, (row, col)), shape = (node_size,node_size))
         
         
     def update_normalized_graph(self):
-        
-        
     
         epsilon = 0.1
         self.normgraph_mat = self.lossmult_sum.multiply(self.lossmult_counts.power(-1.))
@@ -542,7 +525,6 @@ class InfluenceGraphv4: # 2nd order approaches (Correlation Based)
         vals = vals/np.sqrt(1.01-(vals**2))
         self.normgraph_mat = csr_matrix((vals, (x, y)), shape = (self.node_size,self.node_size))
 
-
         return self.normgraph_mat
 
         
@@ -558,19 +540,16 @@ class InfluenceGraphv4: # 2nd order approaches (Correlation Based)
         trainlossdiff_squared_graph = csr_matrix((trainlossdiff_flat**2, (locations_x,locations_y)), shape = (self.node_size,self.node_size))
         batchlossdiff_squared_graph = csr_matrix((batchlossdiff_flat**2, (locations_x,locations_y)), shape = (self.node_size,self.node_size))
 
-        
         count_mat = csr_matrix((class_normalizer*np.ones(len(locations_x)), (locations_x,locations_y)), shape = (self.node_size,self.node_size))
 
         self.lossmult_sum  = self.lossmult_sum + lossmult_mat
         self.passive_sum = self.passive_sum + trainlossdiff_graph
         self.active_sum = self.active_sum + batchlossdiff_graph
         
-        
         self.passive_square_sum = self.passive_square_sum + trainlossdiff_squared_graph
         self.active_square_sum = self.active_square_sum + batchlossdiff_squared_graph
         
         self.lossmult_counts = self.lossmult_counts + count_mat
-        
         
         
     def update_influence_graph(self, batch_indices, batch_lossdiff, train_lossdiff):
@@ -600,7 +579,6 @@ class InfluenceGraphv4: # 2nd order approaches (Correlation Based)
         
             # old - new
         
-        
         if self.remove_negatives:
             train_lossdiff = train_lossdiff * (train_lossdiff>0)
         
@@ -608,9 +586,7 @@ class InfluenceGraphv4: # 2nd order approaches (Correlation Based)
         
         # batchlossdiff_mat = np.tile(batch_lossdiff,(1,self.node_size))
         batchlossdiff_mat = np.tile(np.expand_dims(batch_lossdiff,1),(1,self.node_size))
-        
-        
-        
+
         
         if self.clipping:
             trainlossdiff_mat[trainlossdiff_mat>1] = 1
@@ -618,19 +594,21 @@ class InfluenceGraphv4: # 2nd order approaches (Correlation Based)
         if self.negative_clipping:
             trainlossdiff_mat[trainlossdiff_mat<-1] = -1
             
-            
         trainlossmult_mat = trainlossdiff_mat*batchlossdiff_mat
-        
         
         locations_temp = self.locations[mask_mat==1,:]
         trainlossmult_flat = trainlossmult_mat[mask_mat==1]
         trainlossdiff_flat = trainlossdiff_mat[mask_mat==1]
         batchlossdiff_flat = batchlossdiff_mat[mask_mat == 1]
         
-        
-        
-        self.update_graph_mat_oneshot(batch_indices[locations_temp[:,0]],locations_temp[:,1],
-                                      trainlossmult_flat,trainlossdiff_flat, batchlossdiff_flat, class_normalizer)
+        self.update_graph_mat_oneshot(
+            batch_indices[locations_temp[:,0]],
+            locations_temp[:,1],
+            trainlossmult_flat,
+            trainlossdiff_flat,
+            batchlossdiff_flat,
+            class_normalizer
+        )
         
     
     def prune_graph(self, abs_threshold):
@@ -642,9 +620,10 @@ class InfluenceGraphv4: # 2nd order approaches (Correlation Based)
         filtered_x = x[indices]
         filtered_y = y[indices]
         
-        self.normgraph_mat = csr_matrix((filtered_vals, (filtered_x, filtered_y)), 
-                                        shape = (self.normgraph_mat.shape[0],self.normgraph_mat.shape[1]))
-        
+        self.normgraph_mat = csr_matrix(
+            (filtered_vals, (filtered_x, filtered_y)),
+            shape=(self.normgraph_mat.shape[0], self.normgraph_mat.shape[1])
+        )
         return self.normgraph_mat
 
         
@@ -655,7 +634,6 @@ class InfluenceGraphv4: # 2nd order approaches (Correlation Based)
         if not os.path.exists(folder):
             os.makedirs(folder)
         os.chdir(folder)
-        
         
         newpath = loader_params['dataset_name'] 
                            
@@ -941,7 +919,6 @@ class IG_Measures:
             return self.IG_sparsemat[binary_group_id == 0][:, binary_group_id == 1].sum()/np.sum(binary_group_id == 1)
 
     def mean_in_cluster_degree(self,percentile_thresholds = np.arange(20,50,0.5)):
-        
         
         x,y = self.IG_sparsemat.nonzero()
         vals = self.IG_sparsemat.data

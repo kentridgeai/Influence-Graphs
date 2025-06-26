@@ -26,8 +26,6 @@ import torch.nn as nn
 
 
 
-
-
 # influence_GT_params: 
 
     
@@ -72,7 +70,6 @@ class InfluenceGraph_GT:
         batch_indices = batch_indices.cpu()
         
         mask_mat = np.ones((len(batch_indices),self.node_size))
-        
         mask_mat[:,batch_indices] = 0 
         
         if self.intraclass_only:
@@ -81,20 +78,19 @@ class InfluenceGraph_GT:
             labeleq_mat = batchlabel_mat == reflabel_mat
             mask_mat = mask_mat * labeleq_mat 
         
-            
         influence_vec = trainlosses 
-        
         influence_mat = np.tile(influence_vec, (len(batch_indices),1))
         
-        # batchlossdiff_mat = np.tile(batch_lossdiff + epsilon,(1,self.node_size))
-      
-        
+        # batchlossdiff_mat = np.tile(batch_lossdiff + epsilon,(1,self.node_size))  
         
         locations_temp = self.locations[mask_mat==1,:]
         influences = influence_mat[mask_mat==1]
         
-        self.update_graph_mat_oneshot(batch_indices[locations_temp[:,0]],locations_temp[:,1],
-                                      influences)
+        self.update_graph_mat_oneshot(
+            batch_indices[locations_temp[:,0]],
+            locations_temp[:,1],
+            influences
+        )
         
         
     def store_graph(self,folder,loader_params, influence_GT_params, influence_GT_train_params):
@@ -102,7 +98,6 @@ class InfluenceGraph_GT:
         if not os.path.exists(folder):
             os.makedirs(folder)
         os.chdir(folder)
-        
         
         newpath = loader_params['dataset_name'] +'_GT' 
                            
@@ -141,11 +136,8 @@ class InfluenceGraph_GT:
     
     
     
-
-    
 def update_InfluenceGraph_GT(model, IG_GT, batch_indices, IG_trainloader, train_params):
     # s = time.time() 
-    
     
     model = model.eval()
     
@@ -158,7 +150,6 @@ def update_InfluenceGraph_GT(model, IG_GT, batch_indices, IG_trainloader, train_
         criterion = nn.CrossEntropyLoss(reduction = 'none') 
     elif train_params['criterion'] == 'MSELoss':
         criterion = nn.MSELoss(reduction = 'none') 
-        
         
         # one batch update
     # s = time.time()
@@ -177,14 +168,16 @@ def update_InfluenceGraph_GT(model, IG_GT, batch_indices, IG_trainloader, train_
     return IG_GT, np.mean(trainloss[batch_indices.cpu()])
 
 
-def batch_influence_GT(model_params, trainloader, IG_trainloader, influence_GT_params, influence_GT_train_params,loader_params):
+def batch_influence_GT(model_params, trainloader, IG_trainloader, influence_GT_params, influence_GT_train_params, loader_params):
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
     node_size = trainloader.dataset.inputs.shape[0]
     
-    IG_GT = InfluenceGraph_GT(node_size, trainloader.dataset.labels.squeeze().cpu().numpy(),
-                      trainloader.batch_size,influence_GT_params)
-    
-        
+    IG_GT = InfluenceGraph_GT(
+        node_size,
+        trainloader.dataset.labels.squeeze().cpu().numpy(),
+        trainloader.batch_size,influence_GT_params
+    )
         
     if influence_GT_train_params['criterion'] == 'BCEWithLogitsLoss':
         criterion = nn.BCEWithLogitsLoss()
@@ -192,7 +185,6 @@ def batch_influence_GT(model_params, trainloader, IG_trainloader, influence_GT_p
         criterion = nn.CrossEntropyLoss() 
     elif influence_GT_train_params['criterion'] == 'MSELoss':
         criterion = nn.MSELoss() 
-        
         
     flag = 0
     
@@ -205,12 +197,26 @@ def batch_influence_GT(model_params, trainloader, IG_trainloader, influence_GT_p
             
             # trainloss = estimate_starting_trainloss(model, IG_trainloader, train_params)
             if influence_GT_train_params['optimizer'] == 'SGD':
-                    optimizer = optim.SGD(model.parameters(), lr=influence_GT_train_params['init_rate'], momentum=0.9, weight_decay = influence_GT_train_params['weight_decay'])
+                    optimizer = optim.SGD(
+                        model.parameters(),
+                        lr=influence_GT_train_params['init_rate'],
+                        momentum=0.9,
+                        weight_decay=influence_GT_train_params['weight_decay']
+                    )
+                
             elif influence_GT_train_params['optimizer'] == 'Adam':
-                    optimizer = optim.Adam(model.parameters(), lr=influence_GT_train_params['init_rate'], weight_decay = influence_GT_train_params['weight_decay'])
+                    optimizer = optim.Adam(
+                        model.parameters(),
+                        lr=influence_GT_train_params['init_rate'],
+                        weight_decay=influence_GT_train_params['weight_decay']
+                    )
+                
             elif influence_GT_train_params['optimizer'] == 'AdamW':
-                    optimizer = optim.AdamW(model.parameters(), lr=influence_GT_train_params['init_rate'], weight_decay = influence_GT_train_params['weight_decay'])
-            
+                    optimizer = optim.AdamW(
+                        model.parameters(),
+                        lr=influence_GT_train_params['init_rate'],
+                        weight_decay=influence_GT_train_params['weight_decay']
+                    )
             
             scheduler = optim.lr_scheduler.ConstantLR(optimizer, factor=1.0)
             
@@ -224,7 +230,7 @@ def batch_influence_GT(model_params, trainloader, IG_trainloader, influence_GT_p
                         step_size_down=influence_GT_train_params['scheduler']['step_size'], 
                         mode='triangular', gamma=influence_GT_train_params['scheduler']['gamma'])
             
-            model = model.cuda()
+            model = model.to(device)
             model = model.train()
             
             s = time.time()

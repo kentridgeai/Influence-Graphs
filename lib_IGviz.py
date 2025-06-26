@@ -30,11 +30,9 @@ def vis_influencepairs(G, images, min_percentile=0, max_percentile=100, num_pair
     if max_percentile == 100:
         indices = indices[::-1]
         
-        
     W = W[indices]
     x = x[indices]
     y = y[indices]
-    
     
     grid_size = int(np.sqrt(num_pairs))
     fig = plt.figure(figsize=(6, 6))  # Keep the overall figure size the same
@@ -56,8 +54,7 @@ def vis_influencepairs(G, images, min_percentile=0, max_percentile=100, num_pair
         ax2.axis('off')
     
     plt.show()
-    
-    
+
     # for i in range(num_pairs):
     #     f, axarr = plt.subplots(1,2)
     #     axarr[0].imshow(images[L[i][0]].permute(1,2,0).squeeze().cpu())
@@ -65,9 +62,6 @@ def vis_influencepairs(G, images, min_percentile=0, max_percentile=100, num_pair
     #     # Create a bar with red color that spans the entire plot
         
     
-
-
-
 
 def vis_influencenodes(G,images, min_percentile = 0, max_percentile = 100, num_nodes = 10):
     
@@ -83,7 +77,6 @@ def vis_influencenodes(G,images, min_percentile = 0, max_percentile = 100, num_n
     if max_percentile == 100:
         indices = indices[::-1]
         
-    
     grid_size = int(np.sqrt(num_nodes))
     f, axarr = plt.subplots(grid_size, grid_size, figsize=(6, 6))
     
@@ -100,7 +93,12 @@ def vis_influencenodes(G,images, min_percentile = 0, max_percentile = 100, num_n
     f.patches.append(bar)
     
     # Green out the part between min_percentile and max_percentile
-    green_bar = patches.Rectangle((min_percentile / 100, -0.02), (max_percentile - min_percentile) / 100, 0.05, transform=f.transFigure, color='green')
+    green_bar = patches.Rectangle(
+        (min_percentile / 100, -0.02),
+        (max_percentile - min_percentile) / 100, 0.05,
+        transform=f.transFigure,
+        color='green'
+    )
     f.patches.append(green_bar)
     
     plt.show()

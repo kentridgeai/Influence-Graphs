@@ -20,8 +20,6 @@ from scipy.sparse import csr_matrix
 # Convert to NetworkX graph
 
 
-
-
 def IG_coverageprune_data(G, target_num_nodes=500, batch_remove=1,mode='max'):
     
     G_copy = G.copy()
@@ -60,7 +58,6 @@ def IG_coverageprune_data(G, target_num_nodes=500, batch_remove=1,mode='max'):
             G_copy = G_copy[mask][:, mask]
             
             nodes_list = nodes_list[mask]
-            
         
     return nodes_list, G_copy
         
@@ -101,8 +98,7 @@ def IG_iterativecoverageprune_data(Gerard, target_num_nodes=500, max_iterations=
         
         G_copy = G_copy[mask][:, mask]
         nodes_list = nodes_list[mask]
-        
-    
+         
     indices = nodes_list 
     
     G = Gerard.copy()
@@ -134,7 +130,6 @@ def IG_iterativecoverageprune_data(Gerard, target_num_nodes=500, max_iterations=
     nodes_list = nodes_list2[mask]  # Keep only nodes in top_indices
 
     return nodes_list, G
-
 
 
 
@@ -176,8 +171,7 @@ def IG_adversaryprune_data(G, target_num_nodes=500, batch_remove=1,mode='max'):
             G_copy = G_copy[mask][:, mask]
             
             nodes_list = nodes_list[mask]
-            
-        
+               
     return nodes_list, G_copy
 
     

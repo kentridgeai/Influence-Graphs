@@ -21,11 +21,12 @@ import torchvision
 from lib_graph import * 
 from lib_preprocessing import *
 import matplotlib.pyplot as plt
-import copy 
+import copy
+
 
 
 class Dataset_v2(data.Dataset):
-    # Characterizes a dataset for PyTorch'
+    # Characterizes a dataset for PyTorch
     
     def __init__(self, inputs, labels, transform=None):
         # 'Initialization'
@@ -68,81 +69,110 @@ class ImageFolderWithIndex(datasets.ImageFolder):
 
     
 def genloaders_fromfolder(train_dir, test_dir, loader_params):
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
     imagenet_data = torchvision.datasets.ImageNet('path/to/imagenet_root/')
      
     train_data =  ImageFolderWithIndex(train_dir,transform = loader_params.transform)
     test_data =  ImageFolderWithIndex(test_dir,transform = loader_params.transform)
     
-    trainloader = torch.utils.data.DataLoader(train_data, batch_size= loader_params.batch_size,
-                                          shuffle=True,generator=torch.Generator(device='cuda'), num_workers=0)
-    testloader = torch.utils.data.DataLoader(train_data, batch_size= loader_params.batch_size,
-                                          shuffle=True,generator=torch.Generator(device='cuda'), num_workers=0)
-    
-    IG_trainloader = torch.utils.data.DataLoader(train_data, batch_size=loader_params.IG_batch_size,
-                                          shuffle=True,generator=torch.Generator(device='cuda'), num_workers=0)
-    
+    trainloader = torch.utils.data.DataLoader(
+        train_data,
+        batch_size=loader_params.batch_size,
+        shuffle=True,
+        generator=torch.Generator(device=device),
+        num_workers=0
+    )
+    testloader = torch.utils.data.DataLoader(
+        train_data,
+        batch_size=loader_params.batch_size,
+        shuffle=True,
+        generator=torch.Generator(device=device),
+        num_workers=0
+    )
+    IG_trainloader = torch.utils.data.DataLoader(
+        train_data,
+        batch_size=loader_params.IG_batch_size,
+        shuffle=True,
+        generator=torch.Generator(device=device),
+        num_workers=0
+    )
     return trainloader, testloader, IG_trainloader
     
     
 
 def genloaders(X_train, y_train, X_test, y_test, loader_params):
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
     if loader_params['convert_to_torch']:
-        X_train = torch.from_numpy(X_train).float().cuda()
-        y_train = torch.from_numpy(y_train).cuda()
+        X_train = torch.from_numpy(X_train).float().to(device)
+        y_train = torch.from_numpy(y_train).to(device)
         
-        X_test = torch.from_numpy(X_test).float().cuda()
-        y_test = torch.from_numpy(y_test).cuda()
+        X_test = torch.from_numpy(X_test).float().to(device)
+        y_test = torch.from_numpy(y_test).to(device)
     
     if loader_params['training_size'] != 'full':
         X_train = X_train[0:loader_params['training_size']]
         y_train = y_train[0:loader_params['training_size']]
-        
     
     if loader_params['conversion'] == 'rank':
-        X_train,params = rank_convert_data(X_train)
-        X_test = rank_convert_data(X_test,params)
+        X_train, params = rank_convert_data(X_train)
+        X_test = rank_convert_data(X_test, params)
+        
     elif loader_params['conversion'] == 'uniform':
         # X = uniform_convert_data(X)
         X_train,params = uniform_convert_data(X_train)
-        X_test = uniform_convert_data(X_test,params)
+        X_test = uniform_convert_data(X_test, params)
+        
     elif loader_params['conversion'] == 'uniform_scale':
         # X = uniform_convert_data(X)
-        X_train,params = uniform_scale_convert_data(X_train)
-        X_test = uniform_scale_convert_data(X_test,params)
+        X_train, params = uniform_scale_convert_data(X_train)
+        X_test = uniform_scale_convert_data(X_test, params)
+        
     elif loader_params['conversion'] == 'normalize':
         # X = normalized_convert_data(X)
-        X_train,params = normalized_convert_data(X_train)
-        X_test = normalized_convert_data(X_test,params)
+        X_train, params = normalized_convert_data(X_train)
+        X_test = normalized_convert_data(X_test, params)
         
     if loader_params['add_singleton']:
         X_train = X_train.unsqueeze(2).unsqueeze(3)
         X_test = X_test.unsqueeze(2).unsqueeze(3)
         
-        
-    my_dataset = Dataset_v2(X_train, y_train,loader_params['transform'])
-    my_dataset_test = Dataset_v2(X_test, y_test,loader_params['transform'])
+    my_dataset = Dataset_v2(X_train, y_train, loader_params['transform'])
+    my_dataset_test = Dataset_v2(X_test, y_test, loader_params['transform'])
 
-    trainloader = torch.utils.data.DataLoader(my_dataset, batch_size= loader_params['batch_size'],
-                                          shuffle=True,generator=torch.Generator(device='cuda'), num_workers=0)
-    testloader = torch.utils.data.DataLoader(my_dataset_test, batch_size=loader_params['batch_size'],
-                                          shuffle=False,generator=torch.Generator(device='cuda'),num_workers=0)
-    
-    IG_trainloader = torch.utils.data.DataLoader(my_dataset, batch_size=loader_params['IG_batch_size'],
-                                          shuffle=True,generator=torch.Generator(device='cuda'), num_workers=0)
-    
+    trainloader = torch.utils.data.DataLoader(
+        my_dataset,
+        batch_size=loader_params['batch_size'],
+        shuffle=True,
+        generator=torch.Generator(device=device),
+        num_workers=0
+    )
+    testloader = torch.utils.data.DataLoader(
+        my_dataset_test,
+        batch_size=loader_params['batch_size'],
+        shuffle=False,
+        generator=torch.Generator(device=device),
+        num_workers=0
+    )
+    IG_trainloader = torch.utils.data.DataLoader(
+        my_dataset,
+        batch_size=loader_params['IG_batch_size'],
+        shuffle=True,
+        generator=torch.Generator(device=device),
+        num_workers=0
+    )
     return trainloader, testloader, IG_trainloader
 
 
 
 def gen_pruned_loaders(X_train, y_train, X_test, y_test, loader_params):
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
     if loader_params['convert_to_torch']:
-        X_train = torch.from_numpy(X_train).float().cuda()
-        y_train = torch.from_numpy(y_train).cuda()
+        X_train = torch.from_numpy(X_train).float().to(device)
+        y_train = torch.from_numpy(y_train).to(device)
         
-    
     if loader_params['training_size'] != 'full':
         X_train = X_train[0:loader_params['training_size']]
         y_train = y_train[0:loader_params['training_size']]
@@ -151,39 +181,46 @@ def gen_pruned_loaders(X_train, y_train, X_test, y_test, loader_params):
         X_train = X_train[loader_params['train_indices']]
         y_train = y_train[loader_params['train_indices']]
     
-    
-    
     if loader_params['conversion'] == 'rank':
-        X_train,params = rank_convert_data(X_train)
-        X_test = rank_convert_data(X_test,params)
+        X_train, params = rank_convert_data(X_train)
+        X_test = rank_convert_data(X_test, params)
+        
     elif loader_params['conversion'] == 'uniform':
         # X = uniform_convert_data(X)
-        X_train,params = uniform_convert_data(X_train)
-        X_test = uniform_convert_data(X_test,params)
+        X_train, params = uniform_convert_data(X_train)
+        X_test = uniform_convert_data(X_test, params)
+        
     elif loader_params['conversion'] == 'uniform_scale':
         # X = uniform_convert_data(X)
-        X_train,params = uniform_scale_convert_data(X_train)
-        X_test = uniform_scale_convert_data(X_test,params)
+        X_train, params = uniform_scale_convert_data(X_train)
+        X_test = uniform_scale_convert_data(X_test, params)
+        
     elif loader_params['conversion'] == 'normalize':
         # X = normalized_convert_data(X)
-        X_train,params = normalized_convert_data(X_train)
-        X_test = normalized_convert_data(X_test,params)
+        X_train, params = normalized_convert_data(X_train)
+        X_test = normalized_convert_data(X_test, params)
         
     if loader_params['add_singleton']:
         X_train = X_train.unsqueeze(2).unsqueeze(3)
         X_test = X_test.unsqueeze(2).unsqueeze(3)
         
-        
     my_dataset = Dataset_v2(X_train, y_train,loader_params['transform'])
     my_dataset_test = Dataset_v2(X_test, y_test,loader_params['transform'])
 
-    trainloader = torch.utils.data.DataLoader(my_dataset, batch_size= loader_params['batch_size'],
-                                          shuffle=True,generator=torch.Generator(device='cuda'), num_workers=0)
-    testloader = torch.utils.data.DataLoader(my_dataset_test, batch_size=loader_params['batch_size'],
-                                          shuffle=False,generator=torch.Generator(device='cuda'),num_workers=0)
-    
-
-    
+    trainloader = torch.utils.data.DataLoader(
+        my_dataset,
+        batch_size=loader_params['batch_size'],
+        shuffle=True,
+        generator=torch.Generator(device=device),
+        num_workers=0
+    )
+    testloader = torch.utils.data.DataLoader(
+        my_dataset_test,
+        batch_size=loader_params['batch_size'],
+        shuffle=False,
+        generator=torch.Generator(device=device),
+        num_workers=0
+    )
     return trainloader,testloader
 
 
@@ -228,13 +265,14 @@ def update_IG(IG, main_model, batch_indices, old_trainloss, IG_trainloader, trai
     
     if train_params['criterion'] == 'BCEWithLogitsLoss':
         criterion = nn.BCEWithLogitsLoss(reduction = 'none')
+        
     elif train_params['criterion'] == 'CrossEntropyLoss':
-        criterion = nn.CrossEntropyLoss(reduction = 'none') 
+        criterion = nn.CrossEntropyLoss(reduction = 'none')
+        
     elif train_params['criterion'] == 'MSELoss':
         criterion = nn.MSELoss(reduction = 'none') 
         
         
-    
     with torch.no_grad():
         for i, data in enumerate(IG_trainloader, 0):
             # get the inputs
@@ -244,10 +282,9 @@ def update_IG(IG, main_model, batch_indices, old_trainloss, IG_trainloader, trai
             trainloss[indices.cpu()] = loss.cpu() 
             
     
-    
     batchloss_diff = old_batchloss - trainloss[batch_indices]
 
-    trainloss_diff = old_trainloss - trainloss 
+    trainloss_diff = old_trainloss - trainloss
     
     if influence_params['clip_outliers']:
         mean_loss = np.mean(trainloss_diff)
@@ -265,38 +302,40 @@ def update_IG(IG, main_model, batch_indices, old_trainloss, IG_trainloader, trai
             batchloss_diff = batchloss_diff - np.mean(trainloss_diff)
             trainloss_diff = trainloss_diff - np.mean(trainloss_diff)
             
-        
         if influence_params['set_zero_mean'] == 'separate':
             mask = torch.ones(trainloss_diff.size, dtype=torch.bool)
             mask[batch_indices] = False
             batchloss_diff = batchloss_diff - np.mean(batchloss_diff)
             trainloss_diff[mask.cpu()] = trainloss_diff[mask.cpu()] - np.mean(trainloss_diff[mask.cpu()])
             trainloss_diff[batch_indices] = batchloss_diff
-        
-        
+
         
         if influence_params['loss_scaling_span'] == 'batch':
             scale_ref = copy.copy(batchloss_diff)
         elif influence_params['loss_scaling_span'] == 'full':
             scale_ref = copy.copy(trainloss_diff)
-            
+
         
         if influence_params['loss_scaling_type'] == 'mean_absolute':
             scale_ref = np.mean(np.abs(scale_ref)) 
             batchloss_diff = batchloss_diff / scale_ref
             trainloss_diff = trainloss_diff / scale_ref
+            
         elif influence_params['loss_scaling_type'] == 'mean':
             scale_ref = np.abs(np.mean(scale_ref)) 
             batchloss_diff = batchloss_diff / scale_ref
             trainloss_diff = trainloss_diff / scale_ref
+            
         elif influence_params['loss_scaling_type'] == 'max_absolute':
             scale_ref = np.max(np.abs(scale_ref)) 
             batchloss_diff = batchloss_diff / scale_ref
             trainloss_diff = trainloss_diff / scale_ref
+            
         elif influence_params['loss_scaling_type'] == 'root_mean_squared':
             scale_ref = np.sqrt(np.mean(scale_ref**2)) 
             batchloss_diff = batchloss_diff / scale_ref
             trainloss_diff = trainloss_diff / scale_ref
+            
         elif influence_params['loss_scaling_type'] == 'separated_rmse':
             mask = torch.ones(trainloss_diff.size, dtype=torch.bool)
             mask[batch_indices] = False
@@ -304,7 +343,6 @@ def update_IG(IG, main_model, batch_indices, old_trainloss, IG_trainloader, trai
             scale_ref_train = np.sqrt(np.mean(trainloss_diff[mask.cpu()]**2))
             batchloss_diff = batchloss_diff / scale_ref_batch
             trainloss_diff = trainloss_diff / scale_ref_train
-            
             
         elif influence_params['loss_scaling_type'] == 'separated_absolute':
             mask = torch.ones(trainloss_diff.size, dtype=torch.bool)
@@ -315,7 +353,6 @@ def update_IG(IG, main_model, batch_indices, old_trainloss, IG_trainloader, trai
             trainloss_diff = trainloss_diff / scale_ref_train
             trainloss_diff[batch_indices] = batchloss_diff
         
-         
         # print(np.max(trainloss_diff),np.min(trainloss_diff))
         
     # print("diff:", np.mean(batchloss_diff)-np.mean(trainloss_diff))
@@ -327,6 +364,8 @@ def update_IG(IG, main_model, batch_indices, old_trainloss, IG_trainloader, trai
     # return trainloss, batchloss_diff, trainloss_diff
     # return trainloss, loss_sum
     return trainloss
+
+
 
 def estimate_starting_trainloss(model, IG_trainloader, train_params):
     
@@ -341,7 +380,6 @@ def estimate_starting_trainloss(model, IG_trainloader, train_params):
     elif train_params['criterion'] == 'MSELoss':
         criterion = nn.MSELoss(reduction = 'none') 
         
-        
     with torch.no_grad():
         for i, data in enumerate(IG_trainloader, 0):
             # get the inputs
@@ -351,37 +389,62 @@ def estimate_starting_trainloss(model, IG_trainloader, train_params):
             trainloss[indices.cpu()] = loss.cpu() 
             
     model = model.train()
-            
     return trainloss 
     
 
 
-def train_model_general(model,trainloader, train_params):
+def train_model_general(model, trainloader, train_params):
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
     print("Total Model Params: ", count_parameters(model))
 
-    model = model.cuda()
+    model = model.to(device)
     model = model.train()
     
-    
     if train_params['optimizer'] == 'SGD':
-            optimizer = optim.SGD(model.parameters(), lr=train_params['init_rate'], momentum=0.9, weight_decay = train_params['weight_decay'])
+        optimizer = optim.SGD(
+            model.parameters(),
+            lr=train_params['init_rate'],
+            momentum=0.9,
+            weight_decay=train_params['weight_decay']
+        )
     elif train_params['optimizer'] == 'Adam':
-            optimizer = optim.Adam(model.parameters(), lr=train_params['init_rate'], weight_decay = train_params['weight_decay'])
+        optimizer = optim.Adam(
+            model.parameters(),
+            lr=train_params['init_rate'],
+            weight_decay=train_params['weight_decay']
+        )
     elif train_params['optimizer'] == 'AdamW':
-            optimizer = optim.AdamW(model.parameters(), lr=train_params['init_rate'], weight_decay = train_params['weight_decay'])
+        optimizer = optim.AdamW(
+            model.parameters(),
+            lr=train_params['init_rate'],
+            weight_decay=train_params['weight_decay']
+        )
             
     scheduler = optim.lr_scheduler.ConstantLR(optimizer, factor=1.0)
     
     if train_params['scheduler']['name'] == 'StepLR': 
-        scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=train_params['scheduler']['step_size'], gamma= train_params['scheduler']['gamma'])
+        scheduler = optim.lr_scheduler.StepLR(
+            optimizer,
+            step_size=train_params['scheduler']['step_size'],
+            gamma= train_params['scheduler']['gamma']
+        )
     elif train_params['scheduler']['name'] == 'MultiStepLR': 
-        scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=train_params['scheduler']['milestones'], gamma= train_params['scheduler']['gamma'])
+        scheduler = optim.lr_scheduler.MultiStepLR(
+            optimizer,
+            milestones=train_params['scheduler']['milestones'],
+            gamma= train_params['scheduler']['gamma']
+        )
     elif train_params['scheduler']['name'] == 'CyclicLR':
-        scheduler = optim.lr_scheduler.CyclicLR(optimizer, train_params['init_rate'], train_params['scheduler']['max_lr'], 
-                train_params['scheduler']['step_size'], 
-                step_size_down=train_params['scheduler']['step_size'], 
-                mode='triangular', gamma=train_params['scheduler']['gamma'])
+        scheduler = optim.lr_scheduler.CyclicLR(
+            optimizer,
+            train_params['init_rate'],
+            train_params['scheduler']['max_lr'],
+            train_params['scheduler']['step_size'],
+            step_size_down=train_params['scheduler']['step_size'],
+            mode='triangular',
+            gamma=train_params['scheduler']['gamma']
+        )
 
     init_epoch = 0
     all_train_losses = []
@@ -415,8 +478,8 @@ def train_model_general(model,trainloader, train_params):
         for i, data in enumerate(trainloader, 0):
             # get the inputs
             inputs, labels, indices = data
-            # inputs = inputs.cuda()
-            # labels = labels.cuda()
+            # inputs = inputs.to(device)
+            # labels = labels.to(device)
 
             optimizer.zero_grad()
             allouts = model(inputs)
@@ -429,8 +492,6 @@ def train_model_general(model,trainloader, train_params):
             loss_weights.append(len(labels))
             optimizer.step()
             
-            
-        
         scheduler.step()
         all_train_losses.append(np.average(np.array(train_loss),weights=np.array(loss_weights)))
         if train_params['disp_loss_epoch'] == True:
@@ -438,9 +499,7 @@ def train_model_general(model,trainloader, train_params):
         
         if train_params['disp_time_per_epoch'] == True and flag == 0: 
             print("Time for one epoch:",time.time()-s)
-            flag = 1
-            
-        
+            flag = 1   
         
     if train_params['disp_loss_final'] == True:
         print(all_train_losses[-1])
@@ -455,35 +514,64 @@ def train_model_general(model,trainloader, train_params):
 
 
 def estimate_influencegraph(model,trainloader, IG_trainloader, train_params, influence_params,loader_params):
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
     print("Total Model Params: ", count_parameters(model))
     
-    model_IG = influence_params['graph_type'](trainloader.dataset.inputs.shape[0],trainloader.dataset.labels.squeeze().cpu().numpy(),
-                              loader_params['batch_size'],influence_params)
+    model_IG = influence_params['graph_type'](
+        trainloader.dataset.inputs.shape[0],
+        trainloader.dataset.labels.squeeze().cpu().numpy(),
+        loader_params['batch_size'],
+        influence_params
+    )
     
-    
-    model = model.cuda()
+    model = model.to(device)
     model = model.train()
     
-    
     if train_params['optimizer'] == 'SGD':
-            optimizer = optim.SGD(model.parameters(), lr=train_params['init_rate'], momentum=0.9, weight_decay = train_params['weight_decay'])
+        optimizer = optim.SGD(
+            model.parameters(),
+            lr=train_params['init_rate'],
+            momentum=0.9,
+            weight_decay=train_params['weight_decay']
+        )
     elif train_params['optimizer'] == 'Adam':
-            optimizer = optim.Adam(model.parameters(), lr=train_params['init_rate'], weight_decay = train_params['weight_decay'])
+        optimizer = optim.Adam(
+            model.parameters(),
+            lr=train_params['init_rate'],
+            weight_decay=train_params['weight_decay']
+        )
     elif train_params['optimizer'] == 'AdamW':
-            optimizer = optim.AdamW(model.parameters(), lr=train_params['init_rate'], weight_decay = train_params['weight_decay'])
+        optimizer = optim.AdamW(
+            model.parameters(),
+            lr=train_params['init_rate'],
+            weight_decay=train_params['weight_decay']
+        )
             
     scheduler = optim.lr_scheduler.ConstantLR(optimizer, factor=1.0)
     
     if train_params['scheduler']['name'] == 'StepLR': 
-        scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=train_params['scheduler']['step_size'], gamma= train_params['scheduler']['gamma'])
+        scheduler = optim.lr_scheduler.StepLR(
+            optimizer,
+            step_size=train_params['scheduler']['step_size'],
+            gamma= train_params['scheduler']['gamma']
+        )
     elif train_params['scheduler']['name'] == 'MultiStepLR': 
-        scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=train_params['scheduler']['milestones'], gamma= train_params['scheduler']['gamma'])
+        scheduler = optim.lr_scheduler.MultiStepLR(
+            optimizer,
+            milestones=train_params['scheduler']['milestones'],
+            gamma= train_params['scheduler']['gamma']
+        )
     elif train_params['scheduler']['name'] == 'CyclicLR':
-        scheduler = optim.lr_scheduler.CyclicLR(optimizer, train_params['init_rate'], train_params['scheduler']['max_lr'], 
-                train_params['scheduler']['step_size'], 
-                step_size_down=train_params['scheduler']['step_size'], 
-                mode='triangular', gamma=train_params['scheduler']['gamma'])
+        scheduler = optim.lr_scheduler.CyclicLR(
+            optimizer,
+            train_params['init_rate'],
+            train_params['scheduler']['max_lr'],
+            train_params['scheduler']['step_size'],
+            step_size_down=train_params['scheduler']['step_size'],
+            mode='triangular',
+            gamma=train_params['scheduler']['gamma']
+        )
 
     init_epoch = 0
     all_train_losses = []
@@ -491,14 +579,14 @@ def estimate_influencegraph(model,trainloader, IG_trainloader, train_params, inf
     
     if train_params['criterion'] == 'BCEWithLogitsLoss':
         criterion = nn.BCEWithLogitsLoss()
+        
     elif train_params['criterion'] == 'CrossEntropyLoss':
-        criterion = nn.CrossEntropyLoss() 
+        criterion = nn.CrossEntropyLoss()
+        
     elif train_params['criterion'] == 'MSELoss':
-        criterion = nn.MSELoss() 
+        criterion = nn.MSELoss()
     
-    flag = 0 
-    
-    
+    flag = 0
     
     trainloss = estimate_starting_trainloss(model, IG_trainloader, train_params)
     # plt.hist(trainloss)
@@ -514,16 +602,15 @@ def estimate_influencegraph(model,trainloader, IG_trainloader, train_params, inf
         
         if train_params['disp_epoch'] == True: 
             print('epoch: ' + str(epoch))
-        
-            
+         
         train_loss = []
         loss_weights = [] 
         
         for i, data in enumerate(trainloader, 0):
             # get the inputs
             inputs, labels, indices = data
-            # inputs = inputs.cuda()
-            # labels = labels.cuda()
+            # inputs = inputs.to(device)
+            # labels = labels.to(device)
 
             optimizer.zero_grad()
             allouts = model(inputs)
@@ -536,7 +623,7 @@ def estimate_influencegraph(model,trainloader, IG_trainloader, train_params, inf
             loss_weights.append(len(labels))
             optimizer.step()
             
-            trainloss = update_IG(model_IG, model, indices, trainloss, IG_trainloader, train_params,influence_params)
+            trainloss = update_IG(model_IG, model, indices, trainloss, IG_trainloader, train_params, influence_params)
             # loss_sums = loss_sums + loss_sum
             # batchloss_diffs = np.append(batchloss_diffs,batch_diffs)
             # trainloss_diffs = np.append(trainloss_diffs,trainloss_diff)
@@ -553,7 +640,6 @@ def estimate_influencegraph(model,trainloader, IG_trainloader, train_params, inf
         
         # plt.pause(1)
     
-        
         scheduler.step()
         all_train_losses.append(np.average(np.array(train_loss),weights=np.array(loss_weights)))
         if train_params['disp_loss_epoch'] == True:
@@ -563,8 +649,6 @@ def estimate_influencegraph(model,trainloader, IG_trainloader, train_params, inf
             print("Time for one epoch:",time.time()-s)
             flag = 1
             
-        
-        
     if train_params['disp_loss_final'] == True:
         print(all_train_losses[-1])
       

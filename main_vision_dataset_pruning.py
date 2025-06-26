@@ -201,8 +201,6 @@ def gen_prunedloaders_vision(loader_params):
             # torchvision.transforms.GaussianBlur(5, sigma=2.0),
          transforms.ToTensor(),
          ])
-
-
     
     if loader_params['dataset_name'] == 'FashionMNIST':
         dataset = torchvision.datasets.FashionMNIST(root=loader_params['root_folder'], train=True,
