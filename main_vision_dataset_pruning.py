@@ -335,24 +335,25 @@ if __name__ == "__main__":
     
     
     train_params = {
-        'optimizer': 'Adam',
-        'scheduler': {'name': None}, # 'step_size': 10, 'milestones':[10,20,30],'gamma':0.8, 'max_lr': 0.01}
-        'init_rate': 0.001,
-        'total_epochs': 100,
-        'weight_decay': 0, 
-        'criterion': 'CrossEntropyLoss',
-        'disp_epoch': False,
-        'disp_loss_epoch': False,
+        'optimizer':           'Adam',
+        'scheduler':           {'name': None}, # 'step_size': 10, 'milestones':[10,20,30],'gamma':0.8, 'max_lr': 0.01}
+        'init_rate':           0.001,
+        'total_epochs':        100,
+        'weight_decay':        0, 
+        'criterion':           'CrossEntropyLoss',
+        'disp_epoch':          False,
+        'disp_loss_epoch':     False,
         'disp_time_per_epoch': True, 
-        'disp_loss_final': False, 
+        'disp_loss_final':     False, 
         'disp_accuracy_final': True
         }
     
     influence_GT_params={
-        'type': 'batch', # batch or representative
+        'type':                'batch', # batch or representative
         'training_iterations': train_params['total_epochs'],
-        'intraclass_only': True,
-        'dtype': np.float16
+        'intraclass_only':     True,
+        # 'dtype': np.float16
+        'dtype':               np.float32,
         }
     influence_GT_train_params={
         'optimizer': 'SGD',

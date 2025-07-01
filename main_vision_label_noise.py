@@ -188,6 +188,7 @@ if __name__ == "__main__":
     ############################## Argument Parser ##############################
     parser = argparse.ArgumentParser(description="Run influence estimation with label noise")
     parser.add_argument('--dataset', type=str, default='MNIST', help='Dataset name')
+    parser.add_argument('--model_name', type=str, default='ShallowMNIST', help='Model for experiment')
     parser.add_argument('--root_folder', type=str, default='../data', help='Root folder for data')
     parser.add_argument('--noise_type', type=str, default='symmetric', choices=['symmetric', 'asymmetric', 'none'], help='Type of label noise')
     parser.add_argument('--program_mode', type=str, default='normal', choices=['normal', 'GT'], help='Run mode')
@@ -205,6 +206,7 @@ if __name__ == "__main__":
 
     # -------------- Unpack parser arguments --------------
     dataset      = args.dataset
+    model_name   = args.model_name
     root_folder  = args.root_folder
     program_mode = args.program_mode # normal or GT (Ground truth)
     save_mode    = args.save_mode # store, load or none
@@ -269,7 +271,7 @@ if __name__ == "__main__":
                 'training_iterations': train_params['total_epochs'],
                 'intraclass_only':     True,
                 # 'dtype':               np.float16
-                'dtype':              np.float32,
+                'dtype':               np.float32,
                 }
             
             influence_GT_train_params = {
@@ -287,7 +289,7 @@ if __name__ == "__main__":
             
             model_params = {
                 'type':        CNN,
-                'name':        'ShallowMNIST',
+                'name':        model_name,
                 'in_channels': 1,
                 'batchnorm':   True,
                 }
