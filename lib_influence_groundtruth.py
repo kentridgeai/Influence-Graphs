@@ -63,8 +63,6 @@ class InfluenceGraph_GT:
         self.influence_sum_mat  = self.influence_sum_mat + influence_mat
         self.influence_count_mat = self.influence_count_mat + count_mat
         
-        
-        
     def update_influence_graph(self, batch_indices,trainlosses):
         
         batch_indices = batch_indices.cpu()

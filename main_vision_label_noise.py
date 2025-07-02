@@ -193,6 +193,7 @@ if __name__ == "__main__":
     parser.add_argument('--noise_type', type=str, default='symmetric', choices=['symmetric', 'asymmetric', 'none'], help='Type of label noise')
     parser.add_argument('--program_mode', type=str, default='normal', choices=['normal', 'GT'], help='Run mode')
     parser.add_argument('--save_mode', type=str, default='load', choices=['load', 'store', 'none'], help='Save or load influence graph')
+    parser.add_argument('--visualize', action='store_true', help='Enable visualization of influence pairs')
     parser.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu', help='Device to use')
     args = parser.parse_args()
 
@@ -210,6 +211,7 @@ if __name__ == "__main__":
     root_folder  = args.root_folder
     program_mode = args.program_mode # normal or GT (Ground truth)
     save_mode    = args.save_mode # store, load or none
+    visualize    = args.visualize
     noise_types  = [args.noise_type] 
     noise_levels = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
 
@@ -228,7 +230,7 @@ if __name__ == "__main__":
                 'conversion':       'none',
                 'root_folder':      root_folder,
                 'training_size':    5000, # 'full'
-                'batch_size':       40,
+                'batch_size':       40,   # 20-40
                 'IG_batch_size':    400, 
                 'transform':        None,
                 'add_singleton':    False,
@@ -378,13 +380,14 @@ if __name__ == "__main__":
             # ''
             # model_IG.store_graph('IG-DB', loader_params, influence_params, train_params)
             #
-            vis_influencepairs(graphmat, trainloader.dataset.inputs, max_percentile = 1, num_pairs=25)
-            print('checkpoint')
-            vis_influencepairs(graphmat, trainloader.dataset.inputs, min_percentile = 99, num_pairs=25)
-
-            vis_influencenodes(graphmat, trainloader.dataset.inputs, max_percentile = 3, num_nodes = 25)
-            print('checkpoint')
-            vis_influencenodes(graphmat, trainloader.dataset.inputs, min_percentile = 97, num_nodes = 25) 
+            if visualize:
+                vis_influencepairs(graphmat, trainloader.dataset.inputs, max_percentile = 1, num_pairs=25)
+                print('checkpoint')
+                vis_influencepairs(graphmat, trainloader.dataset.inputs, min_percentile = 99, num_pairs=25)
+    
+                vis_influencenodes(graphmat, trainloader.dataset.inputs, max_percentile = 3, num_nodes = 25)
+                print('checkpoint')
+                vis_influencenodes(graphmat, trainloader.dataset.inputs, min_percentile = 97, num_nodes = 25) 
             # 
             print('done')
                 

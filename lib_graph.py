@@ -470,7 +470,7 @@ class InfluenceGraphv3: # Gradient descent based approaches
     
 class InfluenceGraphv4: # 2nd order approaches (Correlation Based)
 
-    def __init__(self, node_size,node_labels,batch_update_size, influence_params, transform_params=None):
+    def __init__(self, node_size, node_labels, batch_update_size, influence_params, transform_params=None):
         self.node_size = node_size
         self.node_labels = node_labels
         self.transform_params = transform_params
@@ -487,7 +487,7 @@ class InfluenceGraphv4: # 2nd order approaches (Correlation Based)
         
         row = np.array([0])
         col = np.array([0])
-        data = np.array([0],dtype = influence_params['dtype'])
+        data = np.array([0], dtype = influence_params['dtype'])
         self.lossmult_sum = csr_matrix((data, (row, col)), shape = (node_size, node_size))
         self.passive_sum = csr_matrix((data, (row, col)), shape = (node_size, node_size))
         self.passive_square_sum = csr_matrix((data, (row, col)), shape = (node_size, node_size))
@@ -498,7 +498,6 @@ class InfluenceGraphv4: # 2nd order approaches (Correlation Based)
         
         
     def update_normalized_graph(self):
-    
         epsilon = 0.1
         self.normgraph_mat = self.lossmult_sum.multiply(self.lossmult_counts.power(-1.))
         self.passive_sum = self.passive_sum.multiply(self.lossmult_counts.power(-1.))
@@ -529,7 +528,6 @@ class InfluenceGraphv4: # 2nd order approaches (Correlation Based)
 
         
     def update_graph_mat_oneshot(self, locations_x,locations_y, lossmult, trainlossdiff_flat, batchlossdiff_flat, class_normalizer = 1):
-        
         #  flattening in row-major order: (iterate through all columns for each row)
         #  Assume weights are already flattened
         
