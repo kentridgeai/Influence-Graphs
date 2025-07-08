@@ -30,7 +30,7 @@ cfg_FC = {
     
     'VGG11': [512],
     'VGG13': [512],
-    }
+}
 
 
 class CNN(nn.Module):
@@ -42,10 +42,10 @@ class CNN(nn.Module):
         self.features, in_channels = self._make_layers(cfg_feat[vgg_name])
         self.classifier = self._make_FC(in_channels, cfg_FC[vgg_name])
         
-
     def forward(self, x):
         out = self.features(x)
-        out = out.view(out.size(0), -1)
+        out = torch.flatten(out, 1)
+        # out = out.view(out.size(0), -1)
         out = self.classifier(out)
         return out
 
@@ -71,14 +71,14 @@ class CNN(nn.Module):
             else:
                 if self.batchnorm: 
                     layers += [nn.Conv2d(in_channels, x, kernel_size=3, padding=1),
-                                nn.BatchNorm2d(x),
+                               nn.BatchNorm2d(x),
                                nn.ReLU(inplace=True)]
                 else:
                     layers += [nn.Conv2d(in_channels, x, kernel_size=3, padding=1),
                                nn.ReLU(inplace=True)]
                 in_channels = x
         
-        layers += [nn.AvgPool2d(kernel_size=1, stride=1)]
+        layers += [nn.AdaptiveAvgPool2d((1, 1))]
         
         return nn.Sequential(*layers), in_channels
     
@@ -88,7 +88,7 @@ class CNN(nn.Module):
         for i in range(len(cfg)):
             if self.batchnorm:
                 layers += [nn.Linear(in_channels, cfg[i]),
-                            nn.BatchNorm1d(cfg[i]),
+                           nn.BatchNorm1d(cfg[i]),
                            nn.ReLU(inplace=True)]
             else:
                 layers += [nn.Linear(in_channels, cfg[i]),

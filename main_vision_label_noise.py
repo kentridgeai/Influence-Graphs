@@ -235,7 +235,7 @@ if __name__ == "__main__":
                 'transform':        None,
                 'add_singleton':    False,
                 'convert_to_torch': False,
-                }
+            }
             
             influence_params = {
                 'loss_scaling_span':  'full', # 'batch' or 'full'
@@ -252,7 +252,7 @@ if __name__ == "__main__":
                 # 'dtype':              np.float16,
                 'dtype':              np.float32,
                 'graph_type':         InfluenceGraphv4,
-                }
+            }
             
             train_params = {
                 'optimizer':           'Adam',
@@ -266,7 +266,7 @@ if __name__ == "__main__":
                 'disp_time_per_epoch': True, 
                 'disp_loss_final':     True, 
                 'disp_accuracy_final': True
-                }
+            }
             
             influence_GT_params = {
                 'type':                'batch', # batch or representative
@@ -274,7 +274,7 @@ if __name__ == "__main__":
                 'intraclass_only':     True,
                 # 'dtype':               np.float16
                 'dtype':               np.float32,
-                }
+            }
             
             influence_GT_train_params = {
                 'optimizer':           'SGD',
@@ -287,14 +287,14 @@ if __name__ == "__main__":
                 'disp_loss_epoch':     True,
                 'disp_time_per_batch': True,
                 'disp_total_time':     True,
-                }
+            }
             
             model_params = {
                 'type':        CNN,
                 'name':        model_name,
                 'in_channels': 1,
                 'batchnorm':   True,
-                }
+            }
             
             model = model_params['type'](model_params['name'], model_params['in_channels'], batchnorm = model_params['batchnorm'])
         
