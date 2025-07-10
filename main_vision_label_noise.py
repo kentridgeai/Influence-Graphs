@@ -216,6 +216,8 @@ def prerequisites():
 DEVICE = None
 
 if __name__ == "__main__":
+    import torch.multiprocessing as mp
+    mp.set_start_method('spawn', force=True)
     
     ############################## Argument Parser ##############################
     parser = argparse.ArgumentParser(description="Run influence estimation with label noise")

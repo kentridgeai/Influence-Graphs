@@ -388,7 +388,7 @@ def estimate_starting_trainloss(model, IG_trainloader, train_params):
             trainloss[indices.cpu()] = loss.cpu() 
             
     model = model.train()
-    return trainloss 
+    return trainloss
     
 
 
