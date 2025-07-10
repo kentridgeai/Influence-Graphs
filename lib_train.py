@@ -69,51 +69,46 @@ class ImageFolderWithIndex(datasets.ImageFolder):
 
     
 def genloaders_fromfolder(train_dir, test_dir, loader_params):
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    
-    imagenet_data = torchvision.datasets.ImageNet('path/to/imagenet_root/')
-     
-    train_data =  ImageFolderWithIndex(train_dir,transform = loader_params.transform)
-    test_data =  ImageFolderWithIndex(test_dir,transform = loader_params.transform)
+    train_data =  ImageFolderWithIndex(train_dir, transform = loader_params.transform)
+    test_data  =  ImageFolderWithIndex(test_dir, transform = loader_params.transform)
     
     trainloader = torch.utils.data.DataLoader(
         train_data,
         batch_size=loader_params.batch_size,
         shuffle=True,
-        generator=torch.Generator(device=device),
-        num_workers=0
+        generator=torch.Generator(),
+        num_workers=loader_params.num_workers
     )
     testloader = torch.utils.data.DataLoader(
         train_data,
         batch_size=loader_params.batch_size,
         shuffle=True,
-        generator=torch.Generator(device=device),
-        num_workers=0
+        generator=torch.Generator(),
+        num_workers=loader_params.num_workers
     )
     IG_trainloader = torch.utils.data.DataLoader(
         train_data,
         batch_size=loader_params.IG_batch_size,
         shuffle=True,
-        generator=torch.Generator(device=device),
-        num_workers=0
+        generator=torch.Generator(),
+        num_workers=loader_params.num_workers
     )
     return trainloader, testloader, IG_trainloader
     
     
 
 def genloaders(X_train, y_train, X_test, y_test, loader_params):
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
     if loader_params['convert_to_torch']:
-        X_train = torch.from_numpy(X_train).float().to(device)
-        y_train = torch.from_numpy(y_train).to(device)
+        X_train = torch.from_numpy(X_train).float()
+        y_train = torch.from_numpy(y_train)
         
-        X_test = torch.from_numpy(X_test).float().to(device)
-        y_test = torch.from_numpy(y_test).to(device)
+        X_test = torch.from_numpy(X_test).float()
+        y_test = torch.from_numpy(y_test)
     
     if loader_params['training_size'] != 'full':
-        X_train = X_train[0:loader_params['training_size']]
-        y_train = y_train[0:loader_params['training_size']]
+        X_train = X_train[0: loader_params['training_size']]
+        y_train = y_train[0: loader_params['training_size']]
     
     if loader_params['conversion'] == 'rank':
         X_train, params = rank_convert_data(X_train)
@@ -121,7 +116,7 @@ def genloaders(X_train, y_train, X_test, y_test, loader_params):
         
     elif loader_params['conversion'] == 'uniform':
         # X = uniform_convert_data(X)
-        X_train,params = uniform_convert_data(X_train)
+        X_train, params = uniform_convert_data(X_train)
         X_test = uniform_convert_data(X_test, params)
         
     elif loader_params['conversion'] == 'uniform_scale':
@@ -145,37 +140,36 @@ def genloaders(X_train, y_train, X_test, y_test, loader_params):
         my_dataset,
         batch_size=loader_params['batch_size'],
         shuffle=True,
-        generator=torch.Generator(device=device),
-        num_workers=0
+        generator=torch.Generator(),
+        num_workers=loader_params.num_workers
     )
     testloader = torch.utils.data.DataLoader(
         my_dataset_test,
         batch_size=loader_params['batch_size'],
         shuffle=False,
-        generator=torch.Generator(device=device),
-        num_workers=0
+        generator=torch.Generator(),
+        num_workers=loader_params.num_workers
     )
     IG_trainloader = torch.utils.data.DataLoader(
         my_dataset,
         batch_size=loader_params['IG_batch_size'],
         shuffle=True,
-        generator=torch.Generator(device=device),
-        num_workers=0
+        generator=torch.Generator(),
+        num_workers=loader_params.num_workers
     )
     return trainloader, testloader, IG_trainloader
 
 
 
 def gen_pruned_loaders(X_train, y_train, X_test, y_test, loader_params):
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
     if loader_params['convert_to_torch']:
-        X_train = torch.from_numpy(X_train).float().to(device)
-        y_train = torch.from_numpy(y_train).to(device)
+        X_train = torch.from_numpy(X_train).float()
+        y_train = torch.from_numpy(y_train)
         
     if loader_params['training_size'] != 'full':
-        X_train = X_train[0:loader_params['training_size']]
-        y_train = y_train[0:loader_params['training_size']]
+        X_train = X_train[0: loader_params['training_size']]
+        y_train = y_train[0: loader_params['training_size']]
         
     if loader_params['train_indices'] != 'all':
         X_train = X_train[loader_params['train_indices']]
@@ -211,17 +205,17 @@ def gen_pruned_loaders(X_train, y_train, X_test, y_test, loader_params):
         my_dataset,
         batch_size=loader_params['batch_size'],
         shuffle=True,
-        generator=torch.Generator(device=device),
-        num_workers=0
+        generator=torch.Generator(),
+        num_workers=loader_params.num_workers
     )
     testloader = torch.utils.data.DataLoader(
         my_dataset_test,
         batch_size=loader_params['batch_size'],
         shuffle=False,
-        generator=torch.Generator(device=device),
-        num_workers=0
+        generator=torch.Generator(),
+        num_workers=loader_params.num_workers
     )
-    return trainloader,testloader
+    return trainloader, testloader
 
 
 
@@ -231,31 +225,33 @@ def count_parameters(model):
 
 
 def test_model(model, testloader):
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    model = model.to(device)
     model = model.eval()
     correct = torch.tensor(0)
     dataiter = iter(testloader)
 
     with torch.no_grad():
         for i, data in enumerate(testloader, 0):
-            # get the inputs
             inputs, labels, indices = data
-            inputs = inputs  
+            inputs = inputs.to(device)
+            labels = labels.to(device)
             all_outs = model(inputs)
             predicted = torch.argmax(all_outs,1)
             correct = correct + torch.sum((predicted == labels).float())
     
     accuracy = float(correct) / float(len(testloader.dataset.labels))
-    
     return accuracy
 
 
 
 def update_IG(IG, main_model, batch_indices, old_trainloss, IG_trainloader, train_params, influence_params):
     # s = time.time() 
-    
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
     old_trainloss = copy.deepcopy(old_trainloss)
     
     model = copy.deepcopy(main_model)
+    model = model.to(device)
     model = model.eval()
     
     dataiter = iter(IG_trainloader)
@@ -272,18 +268,17 @@ def update_IG(IG, main_model, batch_indices, old_trainloss, IG_trainloader, trai
     elif train_params['criterion'] == 'MSELoss':
         criterion = nn.MSELoss(reduction = 'none') 
         
-        
     with torch.no_grad():
         for i, data in enumerate(IG_trainloader, 0):
             # get the inputs
             inputs, labels, indices = data
+            inputs = inputs.to(device)
+            labels = labels.to(device)
             allouts = model(inputs)
             loss = criterion(allouts, labels.long())
             trainloss[indices.cpu()] = loss.cpu() 
             
-    
     batchloss_diff = old_batchloss - trainloss[batch_indices]
-
     trainloss_diff = old_trainloss - trainloss
     
     if influence_params['clip_outliers']:
@@ -295,7 +290,6 @@ def update_IG(IG, main_model, batch_indices, old_trainloss, IG_trainloader, trai
         trainloss_diff = np.clip(trainloss_diff, lower_bound, upper_bound)
         batchloss_diff = np.clip(batchloss_diff, lower_bound, upper_bound)
         
-    
     if influence_params['loss_scaling_type'] is not None:
         
         if influence_params['set_zero_mean'] == 'full':
@@ -368,7 +362,9 @@ def update_IG(IG, main_model, batch_indices, old_trainloss, IG_trainloader, trai
 
 
 def estimate_starting_trainloss(model, IG_trainloader, train_params):
-    
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+    model = model.to(device)
     model = model.eval()
     dataiter = iter(IG_trainloader)
     trainloss = np.zeros(IG_trainloader.dataset.inputs.shape[0])
@@ -384,6 +380,8 @@ def estimate_starting_trainloss(model, IG_trainloader, train_params):
         for i, data in enumerate(IG_trainloader, 0):
             # get the inputs
             inputs, labels, indices = data
+            inputs = inputs.to(device)
+            labels = labels.to(device)
             allouts = model(inputs)
             loss = criterion(allouts, labels.long())
             trainloss[indices.cpu()] = loss.cpu() 
@@ -457,8 +455,7 @@ def train_model_general(model, trainloader, train_params):
     elif train_params['criterion'] == 'MSELoss':
         criterion = nn.MSELoss() 
     
-    flag = 0 
-    
+    flag = 0
     
     for epoch in range(train_params['total_epochs']):
 
@@ -471,15 +468,14 @@ def train_model_general(model, trainloader, train_params):
         if train_params['disp_epoch'] == True: 
             print('epoch: ' + str(epoch))
         
-            
         train_loss = []
         loss_weights = [] 
         
         for i, data in enumerate(trainloader, 0):
             # get the inputs
             inputs, labels, indices = data
-            # inputs = inputs.to(device)
-            # labels = labels.to(device)
+            inputs = inputs.to(device)
+            labels = labels.to(device)
 
             optimizer.zero_grad()
             allouts = model(inputs)
@@ -493,27 +489,27 @@ def train_model_general(model, trainloader, train_params):
             optimizer.step()
             
         scheduler.step()
-        all_train_losses.append(np.average(np.array(train_loss),weights=np.array(loss_weights)))
+        all_train_losses.append(np.average(np.array(train_loss), weights=np.array(loss_weights)))
         if train_params['disp_loss_epoch'] == True:
             print("Training Loss:", all_train_losses[-1])
         
         if train_params['disp_time_per_epoch'] == True and flag == 0: 
-            print("Time for one epoch:",time.time()-s)
+            print("Time for one epoch:", time.time()-s)
             flag = 1   
         
     if train_params['disp_loss_final'] == True:
         print(all_train_losses[-1])
       
     if train_params['disp_accuracy_final'] == True:
-        accuracy = test_model(model,trainloader)
+        accuracy = test_model(model, trainloader)
     
     model = model.eval()
     
-    return model,all_train_losses
+    return model, all_train_losses
 
 
 
-def estimate_influencegraph(model,trainloader, IG_trainloader, train_params, influence_params,loader_params):
+def estimate_influencegraph(model, trainloader, IG_trainloader, train_params, influence_params, loader_params):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
     print("Total Model Params: ", count_parameters(model))
@@ -609,8 +605,8 @@ def estimate_influencegraph(model,trainloader, IG_trainloader, train_params, inf
         for i, data in enumerate(trainloader, 0):
             # get the inputs
             inputs, labels, indices = data
-            # inputs = inputs.to(device)
-            # labels = labels.to(device)
+            inputs = inputs.to(device)
+            labels = labels.to(device)
 
             optimizer.zero_grad()
             allouts = model(inputs)
@@ -658,7 +654,7 @@ def estimate_influencegraph(model,trainloader, IG_trainloader, train_params, inf
     model = model.eval()
     # model_IG.update_normalized_graph()
     
-    return model,all_train_losses,model_IG
+    return model, all_train_losses, model_IG
 
 
 

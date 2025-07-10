@@ -68,7 +68,7 @@ def add_label_noise(targets, noise_type, noise_level, num_classes):
 
 
 
-def genloaders_vision(loader_params, labelnoise_params):
+def genloaders_vision(loader_params, labelnoise_params, image_size=(224, 224)):
 
     def preprocess_dataset(dataset, is_grayscale=False):
         if isinstance(dataset.data, np.ndarray):
@@ -85,57 +85,88 @@ def genloaders_vision(loader_params, labelnoise_params):
 
         targets = torch.tensor(dataset.targets)
         return data, targets
+
+    def preprocess_dataset_from_imagefolder(dataset, image_size=(32, 32)):
+        data = []
+        targets = []
+
+        resize_transform = transforms.Compose([
+            transforms.Resize(image_size),
+        ])
+
+        for img, label in dataset:
+            img_tensor = resize_transform(img)
+            data.append(img_tensor)
+            targets.append(label)
+    
+        data = torch.stack(data)
+        targets = torch.tensor(targets)
+        return data, targets
     
     transform_basic = transforms.ToTensor()
     transform_train = transform_test = transform_basic
 
     dataset_name = loader_params['dataset_name']
-    root = loader_params['root_folder']
+    root         = loader_params['root_folder']
+    is_grayscale = False
     
     ############################## Load relevant datasets ##############################
     
     if dataset_name == 'FashionMNIST':
         train = torchvision.datasets.FashionMNIST(root=root, train=True, download=True, transform=transform_train)
-        test = torchvision.datasets.FashionMNIST(root='./data', train=False, download=True, transform=transform_test)
+        test = torchvision.datasets.FashionMNIST(root=root, train=False, download=True, transform=transform_test)
         is_grayscale = True
     
     elif dataset_name == 'MNIST':
         train = torchvision.datasets.MNIST(root=root, train=True, download=True, transform=transform_train)
-        test = torchvision.datasets.MNIST(root='./data', train=False, download=True, transform=transform_test)
+        test = torchvision.datasets.MNIST(root=root, train=False, download=True, transform=transform_test)
         is_grayscale = True
 
     elif dataset_name == 'CIFAR10':
         train = torchvision.datasets.CIFAR10(root=root, train=True, download=True, transform=transform_train)
-        test = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_test)
-        is_grayscale = False
+        test = torchvision.datasets.CIFAR10(root=root, train=False, download=True, transform=transform_test)
 
     elif dataset_name == 'CIFAR100':
         train = torchvision.datasets.CIFAR100(root=root, train=True, download=True, transform=transform_train)
-        test = torchvision.datasets.CIFAR100(root='./data', train=False, download=True, transform=transform_test)
-        is_grayscale = False
+        test = torchvision.datasets.CIFAR100(root=root, train=False, download=True, transform=transform_test)
 
     ############################## Additional fine grained datasets ##############################
     
     elif dataset_name == 'Flowers102':
-        train = torchvision.datasets.Flowers102(root=root, split='train', download=True, transform=transform_train)
-        test = torchvision.datasets.Flowers102(root='./data', split='test', download=True, transform=transform_test)
-        is_grayscale = False
+        flowers_train = torchvision.datasets.Flowers102(root=root, split='train', download=True, transform=transform_train)
+        flowers_val   = torchvision.datasets.Flowers102(root=root, split='val', download=True, transform=transform_train)
+        flowers_test  = torchvision.datasets.Flowers102(root=root, split='test', download=True, transform=transform_test)
+
+        # Use original test split as new train dataset (6149 images)
+        train = flowers_test
+        # Combine train + val into one test dataset (2040 images)
+        test = ConcatDataset([flowers_train, flowers_val])
 
     elif dataset_name == 'FGVCAircraft':
         train = torchvision.datasets.FGVCAircraft(root=root, split='train', download=True, transform=transform_train)
-        test = torchvision.datasets.FGVCAircraft(root='./data', split='test', download=True, transform=transform_test)
-        is_grayscale = False
+        trainval = torchvision.datasets.FGVCAircraft(root=root, split='trainval', download=True, transform=transform_train)
+        val  = torchvision.datasets.Flowers102(root=root, split='val', download=True, transform=transform_train)
+        test = torchvision.datasets.FGVCAircraft(root=root, split='test', download=True, transform=transform_test)
 
     elif dataset_name == 'SVHN':
         train = torchvision.datasets.SVHN(root=root, split='train', download=True, transform=transform_train)
-        test = torchvision.datasets.SVHN(root='./data', split='test', download=True, transform=transform_test)
-        is_grayscale = False
+        test = torchvision.datasets.SVHN(root=root, split='test', download=True, transform=transform_test)
+        extra = torchvision.datasets.SVHN(root=root, split='extra', download=True, transform=transform_test)
 
     else:
         print("ERROR: Unknown dataset:", dataset_name)
 
-    dataset_data, dataset_targets = preprocess_dataset(train, is_grayscale=is_grayscale)
-    dataset_test_data, dataset_test_targets = preprocess_dataset(test, is_grayscale=is_grayscale)
+
+    dataset_data, dataset_targets = None, None
+    dataset_test_data, dataset_test_targets = None, None
+    
+    if dataset_name in ['FashionMNIST', 'MNIST', 'CIFAR10', 'CIFAR100']:
+        dataset_data, dataset_targets = preprocess_dataset(train, is_grayscale=is_grayscale)
+        dataset_test_data, dataset_test_targets = preprocess_dataset(test, is_grayscale=is_grayscale)
+        
+    else:
+        dataset_data, dataset_targets = preprocess_dataset_from_imagefolder(train, image_size=image_size)
+        dataset_test_data, dataset_test_targets = preprocess_dataset_from_imagefolder(test, image_size=image_size)
     
     ############################## Apply Label Noise ##############################
     if labelnoise_params['noise_type'] is not None and labelnoise_params['noise_level'] > 0.0:
@@ -143,15 +174,16 @@ def genloaders_vision(loader_params, labelnoise_params):
         dataset_targets = add_label_noise(
             dataset_targets,
             labelnoise_params['noise_type'], 
-            labelnoise_params['noise_level'], num_classes
+            labelnoise_params['noise_level'],
+            num_classes
         )
 
     ############################## Generate DataLoaders ##############################
     trainloader, testloader, IG_trainloader = genloaders(
-        dataset_data.to(DEVICE),
-        dataset_targets.to(DEVICE),
-        dataset_test_data.to(DEVICE),
-        dataset_test_targets.to(DEVICE),
+        dataset_data,
+        dataset_targets,
+        dataset_test_data,
+        dataset_test_targets,
         loader_params
     )
         
@@ -195,12 +227,14 @@ if __name__ == "__main__":
     parser.add_argument('--save_mode', type=str, default='load', choices=['load', 'store', 'none'], help='Save or load influence graph')
     parser.add_argument('--visualize', action='store_true', help='Enable visualization of influence pairs')
     parser.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu', help='Device to use')
+    parser.add_argument('--num_workers', type=int, default=0, help='Number of workers for loaders')
     args = parser.parse_args()
 
     # -------------- Device Setup --------------
     DEVICE = torch.device(args.device)
     if not torch.cuda.is_available():
         print("WARN: Cuda unavailable, defaulting to cpu...")
+        DEVICE = torch.device('cpu')
     print(f"Using device: {DEVICE}")
 
     prerequisites()
@@ -214,6 +248,7 @@ if __name__ == "__main__":
     visualize    = args.visualize
     noise_types  = [args.noise_type] 
     noise_levels = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
+    num_workers  = args.num_workers
 
     for noise_type in noise_types:
         for noise_level in noise_levels:
@@ -229,12 +264,13 @@ if __name__ == "__main__":
                 'dataset_name':     dataset,
                 'conversion':       'none',
                 'root_folder':      root_folder,
-                'training_size':    5000, # 'full'
+                'training_size':    'full', # 'full'
                 'batch_size':       40,   # 20-40
                 'IG_batch_size':    400, 
                 'transform':        None,
                 'add_singleton':    False,
                 'convert_to_torch': False,
+                'num_workers':      num_workers,
             }
             
             influence_params = {
@@ -249,7 +285,6 @@ if __name__ == "__main__":
                 'clip_outliers':      False,
                 'mode':               'mean', # For InfluenceGraphv3
                 'gradient_lr':        0.1, # For InfluenceGraphv3
-                # 'dtype':              np.float16,
                 'dtype':              np.float32,
                 'graph_type':         InfluenceGraphv4,
             }
@@ -272,7 +307,6 @@ if __name__ == "__main__":
                 'type':                'batch', # batch or representative
                 'training_iterations': train_params['total_epochs'],
                 'intraclass_only':     True,
-                # 'dtype':               np.float16
                 'dtype':               np.float32,
             }
             
@@ -290,13 +324,36 @@ if __name__ == "__main__":
             }
             
             model_params = {
-                'type':        CNN,
-                'name':        model_name,
-                'in_channels': 1,
-                'batchnorm':   True,
+                'type':                CNN,
+                'name':                model_name,
+                'in_channels':         1,
+                'num_classes':         10,
+                'batchnorm':           True,
             }
+
+            # -------------- Customize arguments based on model --------------
+            if dataset == 'MNIST' or dataset == 'FashionMNIST':
+                model_params['name']        = 'ShallowMNIST'
+                model_params['in_channels'] = 1
+                model_params['num_classes'] = 10
             
-            model = model_params['type'](model_params['name'], model_params['in_channels'], batchnorm = model_params['batchnorm'])
+            elif dataset == 'CIFAR10':
+                model_params['name']        = 'ShallowCIFAR10'
+                model_params['in_channels'] = 3
+                model_params['num_classes'] = 10
+            
+            elif dataset == 'Flowers102':
+                model_params['name']        = 'ShallowCIFAR10'
+                model_params['in_channels'] = 3
+                model_params['num_classes'] = 102
+            
+            
+            model = model_params['type'](
+                model_params['name'],
+                in_channels = model_params['in_channels'],
+                num_classes = model_params['num_classes'],
+                batchnorm = model_params['batchnorm']
+            )
         
             trainloader, testloader, IG_trainloader = genloaders_vision(loader_params, labelnoise_params)
             
