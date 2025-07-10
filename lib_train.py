@@ -75,21 +75,18 @@ def genloaders_fromfolder(train_dir, test_dir, loader_params):
     trainloader = torch.utils.data.DataLoader(
         train_data,
         batch_size=loader_params['batch_size'],
-        shuffle=True,
         pin_memory=True,
         num_workers=loader_params['num_workers']
     )
     testloader = torch.utils.data.DataLoader(
         train_data,
         batch_size=loader_params['batch_size'],
-        shuffle=True,
         pin_memory=True,
         num_workers=loader_params['num_workers']
     )
     IG_trainloader = torch.utils.data.DataLoader(
         train_data,
         batch_size=loader_params['IG_batch_size'],
-        shuffle=True,
         pin_memory=True,
         num_workers=loader_params['num_workers']
     )
@@ -139,21 +136,18 @@ def genloaders(X_train, y_train, X_test, y_test, loader_params):
     trainloader = torch.utils.data.DataLoader(
         my_dataset,
         batch_size=loader_params['batch_size'],
-        shuffle=True,
         pin_memory=True,
         num_workers=loader_params['num_workers']
     )
     testloader = torch.utils.data.DataLoader(
         my_dataset_test,
         batch_size=loader_params['batch_size'],
-        shuffle=False,
         pin_memory=True,
         num_workers=loader_params['num_workers']
     )
     IG_trainloader = torch.utils.data.DataLoader(
         my_dataset,
         batch_size=loader_params['IG_batch_size'],
-        shuffle=True,
         pin_memory=True,
         num_workers=loader_params['num_workers']
     )
@@ -204,14 +198,12 @@ def gen_pruned_loaders(X_train, y_train, X_test, y_test, loader_params):
     trainloader = torch.utils.data.DataLoader(
         my_dataset,
         batch_size=loader_params['batch_size'],
-        shuffle=True,
         pin_memory=True,
         num_workers=loader_params['num_workers']
     )
     testloader = torch.utils.data.DataLoader(
         my_dataset_test,
         batch_size=loader_params['batch_size'],
-        shuffle=False,
         pin_memory=True,
         num_workers=loader_params['num_workers']
     )
