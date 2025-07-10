@@ -366,6 +366,7 @@ if __name__ == "__main__":
                         trainloader.batch_size,influence_GT_params
                     )
                     graphmat = IG_GT.load_graph('IG-DB', loader_params['dataset_name'], 'latest')
+                    
                 else:            
                     IG_GT = batch_influence_GT(
                         model_params,
@@ -387,6 +388,7 @@ if __name__ == "__main__":
                         influence_params
                     )
                     graphmat = model_IG.load_graph('IG-DB', loader_params['dataset_name'],'latest')
+                    
                 else:
                     model, all_train_losses, model_IG = estimate_influencegraph(
                         model,

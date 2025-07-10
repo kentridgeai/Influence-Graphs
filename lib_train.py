@@ -76,6 +76,7 @@ def genloaders_fromfolder(train_dir, test_dir, loader_params):
         train_data,
         batch_size=loader_params['batch_size'],
         shuffle=True,
+        pin_memory=True,
         generator=torch.Generator(),
         num_workers=loader_params['num_workers']
     )
@@ -83,6 +84,7 @@ def genloaders_fromfolder(train_dir, test_dir, loader_params):
         train_data,
         batch_size=loader_params['batch_size'],
         shuffle=True,
+        pin_memory=True,
         generator=torch.Generator(),
         num_workers=loader_params['num_workers']
     )
@@ -90,6 +92,7 @@ def genloaders_fromfolder(train_dir, test_dir, loader_params):
         train_data,
         batch_size=loader_params['IG_batch_size'],
         shuffle=True,
+        pin_memory=True,
         generator=torch.Generator(),
         num_workers=loader_params['num_workers']
     )
@@ -140,6 +143,7 @@ def genloaders(X_train, y_train, X_test, y_test, loader_params):
         my_dataset,
         batch_size=loader_params['batch_size'],
         shuffle=True,
+        pin_memory=True,
         generator=torch.Generator(),
         num_workers=loader_params['num_workers']
     )
@@ -147,6 +151,7 @@ def genloaders(X_train, y_train, X_test, y_test, loader_params):
         my_dataset_test,
         batch_size=loader_params['batch_size'],
         shuffle=False,
+        pin_memory=True,
         generator=torch.Generator(),
         num_workers=loader_params['num_workers']
     )
@@ -154,6 +159,7 @@ def genloaders(X_train, y_train, X_test, y_test, loader_params):
         my_dataset,
         batch_size=loader_params['IG_batch_size'],
         shuffle=True,
+        pin_memory=True,
         generator=torch.Generator(),
         num_workers=loader_params['num_workers']
     )
@@ -205,6 +211,7 @@ def gen_pruned_loaders(X_train, y_train, X_test, y_test, loader_params):
         my_dataset,
         batch_size=loader_params['batch_size'],
         shuffle=True,
+        pin_memory=True,
         generator=torch.Generator(),
         num_workers=loader_params['num_workers']
     )
@@ -212,6 +219,7 @@ def gen_pruned_loaders(X_train, y_train, X_test, y_test, loader_params):
         my_dataset_test,
         batch_size=loader_params['batch_size'],
         shuffle=False,
+        pin_memory=True,
         generator=torch.Generator(),
         num_workers=loader_params['num_workers']
     )
@@ -366,15 +374,16 @@ def estimate_starting_trainloss(model, IG_trainloader, train_params):
 
     model = model.to(device)
     model = model.eval()
-    dataiter = iter(IG_trainloader)
     trainloss = np.zeros(IG_trainloader.dataset.inputs.shape[0])
     
     if train_params['criterion'] == 'BCEWithLogitsLoss':
         criterion = nn.BCEWithLogitsLoss(reduction = 'none')
+        
     elif train_params['criterion'] == 'CrossEntropyLoss':
-        criterion = nn.CrossEntropyLoss(reduction = 'none') 
+        criterion = nn.CrossEntropyLoss(reduction = 'none')
+        
     elif train_params['criterion'] == 'MSELoss':
-        criterion = nn.MSELoss(reduction = 'none') 
+        criterion = nn.MSELoss(reduction = 'none')
         
     with torch.no_grad():
         for i, data in enumerate(IG_trainloader, 0):
