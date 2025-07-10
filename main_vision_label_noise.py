@@ -232,15 +232,6 @@ if __name__ == "__main__":
     parser.add_argument('--num_workers', type=int, default=0, help='Number of workers for loaders')
     args = parser.parse_args()
 
-    # -------------- Device Setup --------------
-    DEVICE = torch.device(args.device)
-    if not torch.cuda.is_available():
-        print("WARN: Cuda unavailable, defaulting to cpu...")
-        DEVICE = torch.device('cpu')
-    print(f"Using device: {DEVICE}")
-
-    prerequisites()
-
     # -------------- Unpack parser arguments --------------
     dataset      = args.dataset
     model_name   = args.model_name
@@ -254,8 +245,7 @@ if __name__ == "__main__":
 
     for noise_type in noise_types:
         for noise_level in noise_levels:
-            gc.collect()
-            torch.cuda.empty_cache()
+            print("Running experiment using noise_type:{}, with noise_level: {}...".format(noise_type, noise_level))
             
             labelnoise_params = {
                 'noise_type':  noise_type,
@@ -358,6 +348,15 @@ if __name__ == "__main__":
             )
         
             trainloader, testloader, IG_trainloader = genloaders_vision(loader_params, labelnoise_params)
+
+            # -------------- Device Setup --------------
+            DEVICE = torch.device(args.device)
+            if not torch.cuda.is_available():
+                print("WARN: Cuda unavailable, defaulting to cpu...")
+                DEVICE = torch.device('cpu')
+            print(f"Using device: {DEVICE}")
+        
+            prerequisites()
             
             if program_mode == 'GT':
                 if save_mode == 'load':
@@ -449,8 +448,11 @@ if __name__ == "__main__":
                 vis_influencenodes(graphmat, trainloader.dataset.inputs, max_percentile = 3, num_nodes = 25)
                 print('checkpoint')
                 vis_influencenodes(graphmat, trainloader.dataset.inputs, min_percentile = 97, num_nodes = 25) 
-            # 
+            #
             print('done')
+            
+            gc.collect()
+            torch.cuda.empty_cache()
                 
 
         
