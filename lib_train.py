@@ -77,7 +77,6 @@ def genloaders_fromfolder(train_dir, test_dir, loader_params):
         batch_size=loader_params['batch_size'],
         shuffle=True,
         pin_memory=True,
-        generator=torch.Generator(),
         num_workers=loader_params['num_workers']
     )
     testloader = torch.utils.data.DataLoader(
@@ -85,7 +84,6 @@ def genloaders_fromfolder(train_dir, test_dir, loader_params):
         batch_size=loader_params['batch_size'],
         shuffle=True,
         pin_memory=True,
-        generator=torch.Generator(),
         num_workers=loader_params['num_workers']
     )
     IG_trainloader = torch.utils.data.DataLoader(
@@ -93,7 +91,6 @@ def genloaders_fromfolder(train_dir, test_dir, loader_params):
         batch_size=loader_params['IG_batch_size'],
         shuffle=True,
         pin_memory=True,
-        generator=torch.Generator(),
         num_workers=loader_params['num_workers']
     )
     return trainloader, testloader, IG_trainloader
@@ -144,7 +141,6 @@ def genloaders(X_train, y_train, X_test, y_test, loader_params):
         batch_size=loader_params['batch_size'],
         shuffle=True,
         pin_memory=True,
-        generator=torch.Generator(),
         num_workers=loader_params['num_workers']
     )
     testloader = torch.utils.data.DataLoader(
@@ -152,7 +148,6 @@ def genloaders(X_train, y_train, X_test, y_test, loader_params):
         batch_size=loader_params['batch_size'],
         shuffle=False,
         pin_memory=True,
-        generator=torch.Generator(),
         num_workers=loader_params['num_workers']
     )
     IG_trainloader = torch.utils.data.DataLoader(
@@ -160,7 +155,6 @@ def genloaders(X_train, y_train, X_test, y_test, loader_params):
         batch_size=loader_params['IG_batch_size'],
         shuffle=True,
         pin_memory=True,
-        generator=torch.Generator(),
         num_workers=loader_params['num_workers']
     )
     return trainloader, testloader, IG_trainloader
@@ -212,7 +206,6 @@ def gen_pruned_loaders(X_train, y_train, X_test, y_test, loader_params):
         batch_size=loader_params['batch_size'],
         shuffle=True,
         pin_memory=True,
-        generator=torch.Generator(),
         num_workers=loader_params['num_workers']
     )
     testloader = torch.utils.data.DataLoader(
@@ -220,7 +213,6 @@ def gen_pruned_loaders(X_train, y_train, X_test, y_test, loader_params):
         batch_size=loader_params['batch_size'],
         shuffle=False,
         pin_memory=True,
-        generator=torch.Generator(),
         num_workers=loader_params['num_workers']
     )
     return trainloader, testloader
