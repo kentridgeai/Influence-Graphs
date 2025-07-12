@@ -13,16 +13,12 @@ Created on Thu Jan  9 12:55:40 2025
 """
 import argparse
 import torch
-from torch.utils import data
 import torch.optim as optim
 import torchvision
 import torchvision.transforms as transforms
 import torchvision.models as models
 
-from copy import deepcopy
 import torch.nn as nn
-from torch.nn import functional as F
-import torch.nn.functional as F
 import numpy as np
 import sys, os
 import torchvision.transforms.functional as TF
@@ -30,22 +26,24 @@ import torchvision.transforms.functional as TF
 import matplotlib.pyplot as plt
 import pickle
 import random
-from PIL import Image
 import scipy
 import time 
 import gc
-
 import json
 
-
-import os
-dir_path = os.path.dirname(os.path.realpath(__file__))
-os.chdir(dir_path)
+from copy import deepcopy
+from torch.utils import data
+from torch.nn import functional as F
+from multiprocessing import Queue, Process
+from PIL import Image
 
 from lib_train import *
 from lib_cnn import * 
 from lib_IGviz import *
 from lib_influence_groundtruth import * 
+
+dir_path = os.path.dirname(os.path.realpath(__file__))
+os.chdir(dir_path)
 
 
 
@@ -154,7 +152,7 @@ def genloaders_vision(loader_params, labelnoise_params, image_size=(224, 224)):
         extra = torchvision.datasets.SVHN(root=root, split='extra', download=True, transform=transform_test)
 
     else:
-        print("ERROR: Unknown dataset:", dataset_name)
+        logger.log("ERROR: Unknown dataset {}".format(dataset_name), level=0)
 
 
     dataset_data, dataset_targets = None, None
@@ -214,6 +212,7 @@ def prerequisites():
 
 
 DEVICE = None
+logger = None
 
 if __name__ == "__main__":
     import torch.multiprocessing as mp
@@ -230,7 +229,16 @@ if __name__ == "__main__":
     parser.add_argument('--visualize', action='store_true', help='Enable visualization of influence pairs')
     parser.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu', help='Device to use')
     parser.add_argument('--num_workers', type=int, default=0, help='Number of workers for loaders')
+    parser.add_argument('--log_verbosity', type=int, default=2, help='log message verbosity (0=critical, 1=info, 2=debug)')
     args = parser.parse_args()
+
+    # -------------- Start logger queue and listener process --------------
+    log_queue = Queue()
+    listener = Process(target=log_listener, args=(log_queue, 1))
+    listener.start()
+
+    logger = InfluenceLogger(log_queue, verbose=args.log_verbosity)
+    logger.log("Main process started.", level=1)
 
     # -------------- Unpack parser arguments --------------
     dataset      = args.dataset
@@ -243,9 +251,18 @@ if __name__ == "__main__":
     noise_levels = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
     num_workers  = args.num_workers
 
+    # -------------- Device Setup --------------
+    DEVICE = torch.device(args.device)
+    if not torch.cuda.is_available():
+        logger.log("WARN: Cuda unavailable, defaulting to cpu...", level=0)
+        DEVICE = torch.device('cpu')
+    logger.log("Using device: {}".format(DEVICE), level=1)
+
+    prerequisites()
+
     for noise_type in noise_types:
         for noise_level in noise_levels:
-            print("Running experiment using noise_type:{}, with noise_level: {}...".format(noise_type, noise_level))
+            logger.log("Running experiment using noise_type:{}, with noise_level: {}...".format(noise_type, noise_level), level=1)
             
             labelnoise_params = {
                 'noise_type':  noise_type,
@@ -349,14 +366,7 @@ if __name__ == "__main__":
         
             trainloader, testloader, IG_trainloader = genloaders_vision(loader_params, labelnoise_params)
 
-            # -------------- Device Setup --------------
-            DEVICE = torch.device(args.device)
-            if not torch.cuda.is_available():
-                print("WARN: Cuda unavailable, defaulting to cpu...")
-                DEVICE = torch.device('cpu')
-            print(f"Using device: {DEVICE}")
-        
-            prerequisites()
+            logger.log("Dataloaders generated, starting influence computation for program_mode {}...".format(program_mode), level=1)
             
             if program_mode == 'GT':
                 if save_mode == 'load':
@@ -397,7 +407,8 @@ if __name__ == "__main__":
                         IG_trainloader,
                         train_params,
                         influence_params,
-                        loader_params
+                        loader_params,
+                        logger=logger
                     )
                     test_accuracy = test_model(model, testloader)
         
@@ -421,8 +432,9 @@ if __name__ == "__main__":
                             'test_accuracy': test_accuracy,
                             'mean_in_degree': mean_in_degree, 
                         }
-                        print('Test Accuracy:', test_accuracy)
-                        print('Mean In Degree:', mean_in_degree)
+
+                        logger.log("Test Accuracy: {}".format(test_accuracy), level=1)
+                        logger.log("Mean In Degree: {}".format(mean_in_degree), level=2)
                         
                         folder_name = os.path.join('Label noise', loader_params['dataset_name']+' (alpha values zero mean 5k)')
                         if not os.path.exists(folder_name):
@@ -442,14 +454,12 @@ if __name__ == "__main__":
             #
             if visualize:
                 vis_influencepairs(graphmat, trainloader.dataset.inputs, max_percentile = 1, num_pairs=25)
-                print('checkpoint')
                 vis_influencepairs(graphmat, trainloader.dataset.inputs, min_percentile = 99, num_pairs=25)
     
                 vis_influencenodes(graphmat, trainloader.dataset.inputs, max_percentile = 3, num_nodes = 25)
-                print('checkpoint')
                 vis_influencenodes(graphmat, trainloader.dataset.inputs, min_percentile = 97, num_nodes = 25) 
             #
-            print('done')
+            logger.log("Main process done.", level=1)
             
             gc.collect()
             torch.cuda.empty_cache()

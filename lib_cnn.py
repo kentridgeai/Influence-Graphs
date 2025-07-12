@@ -9,16 +9,16 @@ import torch.nn as nn
 
 
 cfg_feat = {
-    'ShallowMNIST': [64,'M',128, 'M', 128, 'MP1', 128, 'M4'],
-    'ShallowCIFAR10': [64,'M',128, 'M', 128, 'M', 128, 'M4'],
-    'ShallowfatterMNIST': [64,'M',128, 'M', 256, 'MP1', 512, 'M4'],
-    'ShallowfatterCIFAR10': [64,'M',128, 'M', 256, 'M', 512, 'M4'],
+    'ShallowMNIST': [64,'M',128, 'M', 128, 'MP1', 128, 'M4', 'GA'],
+    'ShallowCIFAR10': [64,'M',128, 'M', 128, 'M', 128, 'M4', 'GA'],
+    'ShallowfatterMNIST': [64,'M',128, 'M', 256, 'MP1', 512, 'M4', 'GA'],
+    'ShallowfatterCIFAR10': [64,'M',128, 'M', 256, 'M', 512, 'M4', 'GA'],
 
     
-    'VGG11': [64, 'M', 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M'],
-    'VGG13': [64, 64, 'M', 128, 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M'],
-    'VGG16': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'M', 512, 512, 512, 'M', 512, 512, 512, 'M'],
-    'VGG19': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 256, 'M', 512, 512, 512, 512, 'M', 512, 512, 512, 512, 'M'],
+    'GA_VGG11': [64, 'M', 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M', 'GA'],
+    'GA_VGG13': [64, 64, 'M', 128, 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M', 'GA'],
+    'GA_VGG16': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'M', 512, 512, 512, 'M', 512, 512, 512, 'M', 'GA'],
+    'GA_VGG19': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 256, 'M', 512, 512, 512, 512, 'M', 512, 512, 512, 512, 'M', 'GA'],
 }
 
 cfg_FC = {
@@ -30,6 +30,8 @@ cfg_FC = {
     
     'VGG11': [512],
     'VGG13': [512],
+    'VGG16': [512],
+    'VGG19': [512],
 }
 
 
@@ -44,8 +46,7 @@ class CNN(nn.Module):
         
     def forward(self, x):
         out = self.features(x)
-        out = torch.flatten(out, 1)
-        # out = out.view(out.size(0), -1)
+        out = out.view(out.size(0), -1)
         out = self.classifier(out)
         return out
 
@@ -67,6 +68,9 @@ class CNN(nn.Module):
                         else:
                             padding = int(x[2])
                         layers += [nn.MaxPool2d(kernel_size=kernel_size, padding=padding)]
+                        
+            elif x == 'GA':
+                layers += [nn.AdaptiveAvgPool2d((1, 1))]
                 
             else:
                 if self.batchnorm: 
@@ -77,14 +81,11 @@ class CNN(nn.Module):
                     layers += [nn.Conv2d(in_channels, x, kernel_size=3, padding=1),
                                nn.ReLU(inplace=True)]
                 in_channels = x
-        
-        layers += [nn.AdaptiveAvgPool2d((1, 1))]
-        
+                
         return nn.Sequential(*layers), in_channels
     
     def _make_FC(self, in_channels, cfg):
         layers = []
-
         for i in range(len(cfg)):
             if self.batchnorm:
                 layers += [nn.Linear(in_channels, cfg[i]),

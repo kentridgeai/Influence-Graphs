@@ -9,19 +9,22 @@ import os
 dir_path = os.path.dirname(os.path.realpath(__file__))
 os.chdir(dir_path)
 
-
-from torch.utils import data
-
+import matplotlib.pyplot as plt
+import copy
+import sys
+import time
 import torch
 import numpy as np
 import torch.optim as optim
 import torch.nn as nn
-from torchvision import datasets
 import torchvision
+
+from datetime import datetime
+from multiprocessing import Queue, Process, current_process
+from torch.utils import data
+from torchvision import datasets
 from lib_graph import * 
 from lib_preprocessing import *
-import matplotlib.pyplot as plt
-import copy
 
 
 
@@ -52,8 +55,63 @@ class Dataset_v2(data.Dataset):
         y = int(self.labels[index])
 
         return img, y, index
-    
 
+
+
+class InfluenceLogger:
+    def __init__(self, queue: Queue = None, verbose: int = 1):
+        """
+        Args:
+            queue (Queue): multiprocessing queue for inter-process logging.
+            verbose (int): verbosity level (0=critical, 1=info, 2=debug)
+        """
+        self.queue = queue
+        self.verbose = verbose
+        self.start_time = time.time()
+        self.pid = os.getpid()
+        self.process_name = current_process().name
+
+    def log(self, message: str, level: int = 1):
+        """
+        Log a message if it meets the verbosity threshold.
+
+        Args:
+            message (str): The message to log
+            level (int): Message verbosity (0=critical, 1=info, 2=debug)
+        """
+        if level > self.verbose:
+            return  # Skip messages above current verbosity
+
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        elapsed = time.time() - self.start_time
+        log_msg = (
+            f"[{current_time}] (+{elapsed:.2f}s) "
+            f"[PID {self.pid}] [{self.process_name}] {message}"
+        )
+        if self.queue:
+            # Send to main process if running in a worker
+            self.queue.put(log_msg)
+        else:
+            print(log_msg, flush=True)
+
+    def reset_timer(self):
+        """Reset the start time for elapsed time calculation."""
+        self.start_time = time.time()
+
+
+def log_listener(queue: Queue, verbose: int = 1):
+    """Continuously listen for logs from workers and print them."""
+    while True:
+        try:
+            msg = queue.get()
+            if msg == "STOP":
+                break
+            print(msg, flush=True)
+        except Exception as e:
+            print(f"Logger error: {e}", file=sys.stderr)
+
+
+        
 class ImageFolderWithIndex(datasets.ImageFolder):
     """Custom dataset that includes image index as output. Extends
     torchvision.datasets.ImageFolder
@@ -384,10 +442,10 @@ def estimate_starting_trainloss(model, IG_trainloader, train_params):
     
 
 
-def train_model_general(model, trainloader, train_params):
+def train_model_general(model, trainloader, train_params, logger=None):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    
-    print("Total Model Params: ", count_parameters(model))
+
+    logger.log("Training model generally with total params: {}...".format(count_parameters(model)), level=1)
 
     model = model.to(device)
     model = model.train()
@@ -451,15 +509,10 @@ def train_model_general(model, trainloader, train_params):
     flag = 0
     
     for epoch in range(train_params['total_epochs']):
-
-        # batchloss_diffs = np.empty(0)
-        # trainloss_diffs = np.empty(0)
-        # loss_sums = 0
-        # loss_change = []
         s = time.time()
         
-        if train_params['disp_epoch'] == True: 
-            print('epoch: ' + str(epoch))
+        if train_params['disp_epoch'] == True:
+            logger.log("Starting epoch: {}...".format(epoch), level=1)
         
         train_loss = []
         loss_weights = [] 
@@ -469,6 +522,8 @@ def train_model_general(model, trainloader, train_params):
             inputs, labels, indices = data
             inputs = inputs.to(device)
             labels = labels.to(device)
+
+            logger.log("Training model with trainloader {} of length {}...".format(i, len(inputs)), level=2)
 
             optimizer.zero_grad()
             allouts = model(inputs)
@@ -497,15 +552,14 @@ def train_model_general(model, trainloader, train_params):
         accuracy = test_model(model, trainloader)
     
     model = model.eval()
-    
     return model, all_train_losses
 
 
 
-def estimate_influencegraph(model, trainloader, IG_trainloader, train_params, influence_params, loader_params):
+def estimate_influencegraph(model, trainloader, IG_trainloader, train_params, influence_params, loader_params, logger=None):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    
-    print("Total Model Params: ", count_parameters(model))
+
+    logger.log("Estimating influence graph for model with total params: {}...".format(count_parameters(model)), level=1)
     
     model_IG = influence_params['graph_type'](
         trainloader.dataset.inputs.shape[0],
@@ -576,10 +630,7 @@ def estimate_influencegraph(model, trainloader, IG_trainloader, train_params, in
         criterion = nn.MSELoss()
     
     flag = 0
-    
     trainloss = estimate_starting_trainloss(model, IG_trainloader, train_params)
-    # plt.hist(trainloss)
-    # plt.pause(1)
     
     for epoch in range(train_params['total_epochs']):
 
@@ -589,8 +640,8 @@ def estimate_influencegraph(model, trainloader, IG_trainloader, train_params, in
         # loss_change = []
         s = time.time()
         
-        if train_params['disp_epoch'] == True: 
-            print('epoch: ' + str(epoch))
+        if train_params['disp_epoch'] == True:
+            logger.log("Starting epoch: {}...".format(epoch), level=1)
          
         train_loss = []
         loss_weights = [] 
@@ -601,11 +652,12 @@ def estimate_influencegraph(model, trainloader, IG_trainloader, train_params, in
             inputs = inputs.to(device)
             labels = labels.to(device)
 
+            logger.log("Estimating influence graph with trainloader {} of length {}...".format(i, len(inputs)), level=2)
+
             optimizer.zero_grad()
             allouts = model(inputs)
             
-            loss = criterion(allouts, labels.long()) 
-            # print(loss.item())
+            loss = criterion(allouts, labels.long())
             loss.backward()
             train_loss.append(loss.item())
             
@@ -618,16 +670,6 @@ def estimate_influencegraph(model, trainloader, IG_trainloader, train_params, in
             # trainloss_diffs = np.append(trainloss_diffs,trainloss_diff)
             
             # model = model.train()
-        
-        # plt.hist(trainloss)
-        # plt.pause(1)
-        
-        # plt.hist(batchloss_diffs,20)
-        # print(np.mean(batchloss_diffs))
-        # print(np.mean(trainloss_diffs))
-        # print(loss_sums)
-        
-        # plt.pause(1)
     
         scheduler.step()
         all_train_losses.append(np.average(np.array(train_loss),weights=np.array(loss_weights)))
@@ -635,7 +677,7 @@ def estimate_influencegraph(model, trainloader, IG_trainloader, train_params, in
             print("Training Loss:", all_train_losses[-1])
         
         if train_params['disp_time_per_epoch'] == True and flag == 0: 
-            print("Time for one epoch:",time.time()-s)
+            print("Time for one epoch:", time.time()-s)
             flag = 1
             
     if train_params['disp_loss_final'] == True:
