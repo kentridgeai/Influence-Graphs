@@ -305,7 +305,7 @@ if __name__ == "__main__":
                 'total_epochs':        100,
                 'weight_decay':        0, 
                 'criterion':           'CrossEntropyLoss',
-                'disp_epoch':          False,
+                'disp_epoch':          True,
                 'disp_loss_epoch':     False,
                 'disp_time_per_epoch': True, 
                 'disp_loss_final':     True, 

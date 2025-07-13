@@ -68,8 +68,6 @@ class InfluenceLogger:
         self.queue = queue
         self.verbose = verbose
         self.start_time = time.time()
-        self.pid = os.getpid()
-        self.process_name = current_process().name
 
     def log(self, message: str, level: int = 1):
         """
@@ -82,11 +80,14 @@ class InfluenceLogger:
         if level > self.verbose:
             return  # Skip messages above current verbosity
 
+        pid = os.getpid()
+        process_name = current_process().name
+        
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         elapsed = time.time() - self.start_time
         log_msg = (
             f"[{current_time}] (+{elapsed:.2f}s) "
-            f"[PID {self.pid}] [{self.process_name}] {message}"
+            f"[PID {pid}] [{process_name}] {message}"
         )
         if self.queue:
             # Send to main process if running in a worker
@@ -296,7 +297,6 @@ def test_model(model, testloader):
 
 
 def update_IG(IG, main_model, batch_indices, old_trainloss, IG_trainloader, train_params, influence_params):
-    # s = time.time() 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     old_trainloss = copy.deepcopy(old_trainloss)
     
@@ -506,10 +506,7 @@ def train_model_general(model, trainloader, train_params, logger=None):
     elif train_params['criterion'] == 'MSELoss':
         criterion = nn.MSELoss() 
     
-    flag = 0
-    
     for epoch in range(train_params['total_epochs']):
-        s = time.time()
         
         if train_params['disp_epoch'] == True:
             logger.log("Starting epoch: {}...".format(epoch), level=1)
@@ -539,14 +536,11 @@ def train_model_general(model, trainloader, train_params, logger=None):
         scheduler.step()
         all_train_losses.append(np.average(np.array(train_loss), weights=np.array(loss_weights)))
         if train_params['disp_loss_epoch'] == True:
-            print("Training Loss:", all_train_losses[-1])
-        
-        if train_params['disp_time_per_epoch'] == True and flag == 0: 
-            print("Time for one epoch:", time.time()-s)
-            flag = 1   
-        
+            logger.log("Training Loss: {}...".format(all_train_losses[-1]), level=1)
+            
+            
     if train_params['disp_loss_final'] == True:
-        print(all_train_losses[-1])
+        logger.log("Final loss: {}...".format(all_train_losses[-1]), level=1)
       
     if train_params['disp_accuracy_final'] == True:
         accuracy = test_model(model, trainloader)
@@ -629,16 +623,9 @@ def estimate_influencegraph(model, trainloader, IG_trainloader, train_params, in
     elif train_params['criterion'] == 'MSELoss':
         criterion = nn.MSELoss()
     
-    flag = 0
     trainloss = estimate_starting_trainloss(model, IG_trainloader, train_params)
     
     for epoch in range(train_params['total_epochs']):
-
-        # batchloss_diffs = np.empty(0)
-        # trainloss_diffs = np.empty(0)
-        # loss_sums = 0
-        # loss_change = []
-        s = time.time()
         
         if train_params['disp_epoch'] == True:
             logger.log("Starting epoch: {}...".format(epoch), level=1)
@@ -665,23 +652,15 @@ def estimate_influencegraph(model, trainloader, IG_trainloader, train_params, in
             optimizer.step()
             
             trainloss = update_IG(model_IG, model, indices, trainloss, IG_trainloader, train_params, influence_params)
-            # loss_sums = loss_sums + loss_sum
-            # batchloss_diffs = np.append(batchloss_diffs,batch_diffs)
-            # trainloss_diffs = np.append(trainloss_diffs,trainloss_diff)
-            
-            # model = model.train()
     
         scheduler.step()
         all_train_losses.append(np.average(np.array(train_loss),weights=np.array(loss_weights)))
         if train_params['disp_loss_epoch'] == True:
-            print("Training Loss:", all_train_losses[-1])
-        
-        if train_params['disp_time_per_epoch'] == True and flag == 0: 
-            print("Time for one epoch:", time.time()-s)
-            flag = 1
+            logger.log("Training Loss: {}...".format(all_train_losses[-1]), level=1)
+            
             
     if train_params['disp_loss_final'] == True:
-        print(all_train_losses[-1])
+        logger.log("Final loss: {}...".format(all_train_losses[-1]), level=1)
       
     if train_params['disp_accuracy_final'] == True:
         accuracy = test_model(model,trainloader)
