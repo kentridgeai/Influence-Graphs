@@ -5,15 +5,16 @@ Created on Tue Jan  7 15:08:27 2025
 @author: User
 """
 import numpy as np
-from scipy.sparse import csr_matrix
-from scipy import sparse
 import itertools 
 import os
 import pickle
-from scipy.sparse.csgraph import connected_components
 import time 
 import networkx as nx
-import scipy 
+import scipy
+
+from scipy import sparse
+from scipy.sparse import coo_matrix, csr_matrix
+from scipy.sparse.csgraph import connected_components
 
 
 class InfluenceGraph:
@@ -56,59 +57,51 @@ class InfluenceGraph:
 
         self.graph_mat  = self.graph_mat + weight_mat
         self.graph_counts = self.graph_counts + count_mat
-        
-        
+
     def update_influence_graph(self, batch_indices, batch_lossdiff, train_lossdiff):
         
         # Default params: class_normalize = False, remove_negatives = False, clipping = True, intraclass_only = True
         #  itertools also performs computations in row major order 
-        batch_indices = batch_indices.cpu()
-        epsilon = 0.00000001
-        
-        # locations = np.array(list(itertools.product(batch_indices,self.node_list)))
-        # locations = locations.reshape((len(batch_indices),self.node_size,2))
-        mask_mat = np.ones((len(batch_indices),self.node_size))
-        
-        mask_mat[:,batch_indices] = 0 
-        
-        if self.class_normalize:
-            class_normalizer = len(batch_indices)
-        else:
-            class_normalizer = 1
-        
+        batch_indices = batch_indices.cpu().numpy()
+        epsilon = 1e-8
+
+        n = self.node_size
+        B = len(batch_indices)
+
+        # Build mask
+        mask_mat = np.ones((B, n), dtype=bool)
+        mask_mat[np.arange(B)[:, None], batch_indices] = False
+
         if self.intraclass_only:
-            batchlabel_mat = np.tile(np.expand_dims(self.node_labels[batch_indices],1), (1, self.node_size))
-            reflabel_mat = np.tile(self.node_labels, (len(batch_indices),1))
-            labeleq_mat = batchlabel_mat == reflabel_mat
-            mask_mat = mask_mat * labeleq_mat 
+            batch_labels = self.node_labels[batch_indices]
+            label_eq = batch_labels[:, None] == self.node_labels[None, :]
+            mask_mat &= label_eq
+
+        weights_vec = train_lossdiff  # shape: (n,)
+        batch_lossdiff = batch_lossdiff + epsilon  # shape: (B,)
         
-        weights_vec = train_lossdiff # old - new
+        weights_mat = weights_vec[None, :] / batch_lossdiff[:, None]  # (B, n)
+        weights_mat = np.where(mask_mat, weights_mat, 0.0)
         
         if self.remove_negatives:
-            weights_vec = weights_vec * (weights_vec>0)
+            weights_vec = weights_vec * (weights_vec > 0)
+
+        # Clipping
+        if self.clipping:          weights_mat[weights_mat > 1] = 1
+        if self.negative_clipping: weights_mat[weights_mat < -1] = -1
         
-        weights_mat = np.tile(weights_vec, (len(batch_indices),1))
-        
-        # batchlossdiff_mat = np.tile(batch_lossdiff + epsilon,(1,self.node_size))
-        batchlossdiff_mat = np.tile(np.expand_dims(batch_lossdiff,1) + epsilon,(1,self.node_size))
-        
-        weights_mat = weights_mat/batchlossdiff_mat
-        
-        if self.clipping:
-            weights_mat[weights_mat>1] = 1
-        
-        if self.negative_clipping:
-            weights_mat[weights_mat<-1] = -1
-        
-        locations_temp = self.locations[mask_mat==1,:]
-        weights_flat = weights_mat[mask_mat==1]
-        
-        self.update_graph_mat_oneshot(
-            batch_indices[locations_temp[:,0]],
-            locations_temp[:,1],
-            weights_flat,
-            class_normalizer
-        )
+        loc_x, loc_y = np.nonzero(weights_mat)
+        weights_flat = weights_mat[loc_x, loc_y]
+
+        row = batch_indices[loc_x]
+        col = loc_y
+
+        class_normalizer = B if self.class_normalize else 1
+        weight_mat = coo_matrix((weights_flat, (row, col)), shape=(n, n)).tocsr()
+        count_mat = coo_matrix((np.full_like(weights_flat, class_normalizer), (row, col)), shape=(n, n)).tocsr()
+
+        self.graph_mat += weight_mat
+        self.graph_counts += count_mat
         
         
     def store_graph(self,folder,loader_params,influence_params,train_params):

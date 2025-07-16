@@ -23,7 +23,9 @@ from datetime import datetime
 from multiprocessing import Queue, Process, current_process
 from torch.utils import data
 from torchvision import datasets
-from torch.cuda.amp import autocast, GradScaler
+from torch.cuda.amp import GradScaler
+from torch import autocast
+from contextlib import nullcontext
 from lib_graph import * 
 from lib_preprocessing import *
 
@@ -281,7 +283,6 @@ def test_model(model, testloader):
     model = model.to(device)
     model = model.eval()
     correct = torch.tensor(0)
-    dataiter = iter(testloader)
 
     with torch.no_grad():
         for i, data in enumerate(testloader, 0):
@@ -303,12 +304,10 @@ def update_IG(IG, main_model, batch_indices, old_trainloss, IG_trainloader, trai
 
     if logger is not None: logger.log("Updating influence graph...", level=2)
     
-    model = copy.deepcopy(main_model)
+    model = main_model
     model = model.to(device)
     model = model.eval()
     
-    dataiter = iter(IG_trainloader)
-    trainloss = np.zeros(IG.node_size)
     batch_indices = batch_indices.cpu()
     old_batchloss = old_trainloss[batch_indices]
     
@@ -319,18 +318,19 @@ def update_IG(IG, main_model, batch_indices, old_trainloss, IG_trainloader, trai
         criterion = nn.CrossEntropyLoss(reduction = 'none')
         
     elif train_params['criterion'] == 'MSELoss':
-        criterion = nn.MSELoss(reduction = 'none') 
-        
+        criterion = nn.MSELoss(reduction = 'none')
+
+    trainloss = torch.zeros(IG.node_size, device=device)
+
     with torch.no_grad():
-        for i, data in enumerate(IG_trainloader, 0):
-            # get the inputs
-            inputs, labels, indices = data
+        for inputs, labels, indices in IG_trainloader:
             inputs = inputs.to(device)
             labels = labels.to(device)
-            allouts = model(inputs)
-            loss = criterion(allouts, labels.long())
-            trainloss[indices.cpu()] = loss.cpu() 
-            
+            outputs = model(inputs)
+            loss = criterion(outputs, labels.long())
+            trainloss[indices] = loss
+
+    trainloss = trainloss.cpu().numpy()
     batchloss_diff = old_batchloss - trainloss[batch_indices]
     trainloss_diff = old_trainloss - trainloss
     
@@ -422,8 +422,7 @@ def estimate_starting_trainloss(model, IG_trainloader, train_params, logger=None
 
     model = model.to(device)
     model = model.eval()
-    trainloss = np.zeros(IG_trainloader.dataset.inputs.shape[0])
-    
+
     if train_params['criterion'] == 'BCEWithLogitsLoss':
         criterion = nn.BCEWithLogitsLoss(reduction = 'none')
         
@@ -433,16 +432,20 @@ def estimate_starting_trainloss(model, IG_trainloader, train_params, logger=None
     elif train_params['criterion'] == 'MSELoss':
         criterion = nn.MSELoss(reduction = 'none')
 
+    trainloss = torch.zeros(IG_trainloader.dataset.inputs.shape[0], device=device)
+
     # Enable AMP only if CUDA is available
-    autocast_ctx = torch.amp.autocast(device_type='cuda') if use_amp else nullcontext()
-    with autocast_ctx:
-        for i, data in enumerate(IG_trainloader, 0):
-            inputs, labels, indices = data
+    with torch.autocast(device_type=device):
+        for inputs, labels, indices in IG_trainloader:
             inputs = inputs.to(device)
             labels = labels.to(device)
             allouts = model(inputs)
             loss = criterion(allouts, labels.long())
-            trainloss[indices.cpu()] = loss.cpu()
+            
+            # Detach before storing in trainloss
+            trainloss[indices] = loss.detach()
+
+    trainloss = trainloss.cpu().numpy()
 
     if logger is not None: logger.log("Estimated starting trainloss. Returning to compute influence graph...", level=1)
     
@@ -527,7 +530,6 @@ def train_model_general(model, trainloader, train_params, logger=None):
         scaler = GradScaler()
     else:
         # On CPU, no need for GradScaler
-        autocast = torch.cpu.amp.autocast  # Dummy placeholder
         scaler = None
     
     for epoch in range(train_params['total_epochs']):
@@ -551,7 +553,7 @@ def train_model_general(model, trainloader, train_params, logger=None):
 
             if use_amp:
                 # Mixed precision on GPU
-                with autocast():
+                with torch.autocast(device_type=device):
                     allouts = model(inputs)
                     loss = criterion(allouts, labels.long())
     
@@ -580,7 +582,7 @@ def train_model_general(model, trainloader, train_params, logger=None):
         logger.log("Final loss: {}...".format(all_train_losses[-1]), level=1)
       
     if train_params['disp_accuracy_final'] == True:
-        accuracy = test_model(model, trainloader)
+        logger.log("Accuracy: {}...".format(test_model(model, trainloader)), level=1)
     
     model = model.eval()
     return model, all_train_losses
@@ -674,7 +676,6 @@ def estimate_influencegraph(model, trainloader, IG_trainloader, train_params, in
         scaler = GradScaler()
     else:
         # On CPU, no need for GradScaler
-        autocast = torch.cpu.amp.autocast  # Dummy placeholder
         scaler = None
     
     for epoch in range(train_params['total_epochs']):
@@ -698,7 +699,7 @@ def estimate_influencegraph(model, trainloader, IG_trainloader, train_params, in
 
             if use_amp:
                 # Mixed precision on GPU
-                with autocast():
+                with torch.autocast(device_type=device):
                     allouts = model(inputs)
                     loss = criterion(allouts, labels.long())
     
@@ -731,7 +732,7 @@ def estimate_influencegraph(model, trainloader, IG_trainloader, train_params, in
         logger.log("Final loss: {}...".format(all_train_losses[-1]), level=1)
       
     if train_params['disp_accuracy_final'] == True:
-        accuracy = test_model(model,trainloader)
+        logger.log("Accuracy: {}...".format(test_model(model, trainloader)), level=1)
     
     model = model.eval()
     return model, all_train_losses, model_IG
