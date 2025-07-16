@@ -230,7 +230,8 @@ if __name__ == "__main__":
     parser.add_argument('--visualize', action='store_true', help='Enable visualization of influence pairs')
     parser.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu', help='Device to use')
     parser.add_argument('--num_workers', type=int, default=0, help='Number of workers for loaders')
-    parser.add_argument('--log_verbosity', type=int, default=2, help='log message verbosity (0=critical, 1=info, 2=debug)')
+    parser.add_argument('--img_size', type=int, default=32, help='Size to resize input image to')
+    parser.add_argument('--log_verbosity', type=int, default=1, help='log message verbosity (0=critical, 1=info, 2=debug)')
     args = parser.parse_args()
 
     # -------------- Start logger queue and listener process --------------
@@ -251,6 +252,7 @@ if __name__ == "__main__":
     noise_types  = [args.noise_type] 
     noise_levels = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
     num_workers  = args.num_workers
+    img_size     = args.img_size
 
     # -------------- Device Setup --------------
     DEVICE = torch.device(args.device)
@@ -287,8 +289,8 @@ if __name__ == "__main__":
                 'loss_scaling_span':  'full', # 'batch' or 'full'
                 'loss_scaling_type':  'root_mean_squared', # 'mean' or 'mean_absolute' or None
                 'set_zero_mean':      False,# 'full' or 'separate'
-                'class_normalize' :   False, 
-                'remove_negatives' :  False, 
+                'class_normalize' :   False,
+                'remove_negatives' :  False,
                 'clipping' :          False,
                 'intraclass_only' :   True,
                 'negative_clipping':  False,
@@ -338,6 +340,7 @@ if __name__ == "__main__":
                 'name':                model_name,
                 'in_channels':         1,
                 'num_classes':         10,
+                'img_size':            img_size,
                 'batchnorm':           True,
             }
 
@@ -362,10 +365,11 @@ if __name__ == "__main__":
                 model_params['name'],
                 in_channels = model_params['in_channels'],
                 num_classes = model_params['num_classes'],
-                batchnorm = model_params['batchnorm']
+                img_size    = model_params['img_size'],
+                batchnorm   = model_params['batchnorm']
             )
         
-            trainloader, testloader, IG_trainloader = genloaders_vision(loader_params, labelnoise_params)
+            trainloader, testloader, IG_trainloader = genloaders_vision(loader_params, labelnoise_params, image_size=(img_size, img_size))
 
             logger.log("Dataloaders generated, starting influence computation for program_mode {}...".format(program_mode), level=1)
             
@@ -444,14 +448,7 @@ if __name__ == "__main__":
                         # Modify the filename
                         filename = os.path.join(folder_name, labelnoise_params['noise_type'] + str(labelnoise_params['noise_level']))
                         save_params_and_matrix(filename, params_dict, graphmat)
-                            
-                        # sparse.save_npz(loader_params['dataset_name']+'_'+labelnoise_params['noise_type']+
-                        #                 labelnoise_params['noise_level']+".npz", self.normgraph_mat)
         
-                
-            # 
-            # ''
-            # model_IG.store_graph('IG-DB', loader_params, influence_params, train_params)
             #
             if visualize:
                 vis_influencepairs(graphmat, trainloader.dataset.inputs, max_percentile = 1, num_pairs=25)

@@ -9,10 +9,10 @@ import torch.nn as nn
 
 
 cfg_feat = {
-    'ShallowMNIST': [64,'M',128, 'M', 128, 'MP1', 128, 'M4', 'GA'],
-    'ShallowCIFAR10': [64,'M',128, 'M', 128, 'M', 128, 'M4', 'GA'],
-    'ShallowfatterMNIST': [64,'M',128, 'M', 256, 'MP1', 512, 'M4', 'GA'],
-    'ShallowfatterCIFAR10': [64,'M',128, 'M', 256, 'M', 512, 'M4', 'GA'],
+    'ShallowMNIST': [64,'M', 128, 'M', 128, 'MP1', 128, 'M4', 'GA'],
+    'ShallowCIFAR10': [64,'M', 128, 'M', 128, 'M', 128, 'M4', 'GA'],
+    'ShallowfatterMNIST': [64,'M', 128, 'M', 256, 'MP1', 512, 'M4', 'GA'],
+    'ShallowfatterCIFAR10': [64,'M', 128, 'M', 256, 'M', 512, 'M4', 'GA'],
 
     
     'GA_VGG11': [64, 'M', 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M', 'GA'],
@@ -36,19 +36,34 @@ cfg_FC = {
 
 
 class CNN(nn.Module):
-    def __init__(self, vgg_name, in_channels = 1, num_classes = 10, batchnorm = True):
+    def __init__(self, vgg_name, in_channels=1, num_classes=10, img_size=32, batchnorm=True):
         super(CNN, self).__init__()
         self.in_channels = in_channels
         self.num_classes = num_classes
-        self.batchnorm = batchnorm 
-        self.features, in_channels = self._make_layers(cfg_feat[vgg_name])
-        self.classifier = self._make_FC(in_channels, cfg_FC[vgg_name])
+        self.batchnorm = batchnorm
+
+        # Build convolutional feature extractor
+        self.features, out_channels = self._make_layers(cfg_feat[vgg_name])
+
+        # Dynamically compute flattened feature size
+        flatten_size = self._get_flatten_size(img_size, out_channels)
+
+        # Build classifier
+        self.classifier = self._make_FC(flatten_size, cfg_FC[vgg_name])
         
     def forward(self, x):
         out = self.features(x)
         out = out.view(out.size(0), -1)
         out = self.classifier(out)
         return out
+
+    def _get_flatten_size(self, img_size, out_channels):
+        """
+        Pass dummy input to compute size of flattened feature map.
+        """
+        dummy_input = torch.zeros(1, self.in_channels, img_size, img_size)
+        dummy_output = self.features(dummy_input)
+        return dummy_output.view(1, -1).size(1)
 
     def _make_layers(self, cfg):
         layers = []

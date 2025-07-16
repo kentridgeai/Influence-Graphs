@@ -559,7 +559,7 @@ class InfluenceGraphv4: # 2nd order approaches (Correlation Based)
         
         # locations = np.array(list(itertools.product(batch_indices,self.node_list)))
         # locations = locations.reshape((len(batch_indices),self.node_size,2))
-        mask_mat = np.ones((len(batch_indices),self.node_size))
+        mask_mat = np.ones((len(batch_indices), self.node_size))
         
         mask_mat[:,batch_indices] = 0 
         
@@ -575,17 +575,12 @@ class InfluenceGraphv4: # 2nd order approaches (Correlation Based)
             labeleq_mat = batchlabel_mat == reflabel_mat
             mask_mat = mask_mat * labeleq_mat 
         
-            # old - new
-        
         if self.remove_negatives:
             train_lossdiff = train_lossdiff * (train_lossdiff>0)
         
-        trainlossdiff_mat = np.tile(train_lossdiff, (len(batch_indices),1))
-        
-        # batchlossdiff_mat = np.tile(batch_lossdiff,(1,self.node_size))
-        batchlossdiff_mat = np.tile(np.expand_dims(batch_lossdiff,1),(1,self.node_size))
+        trainlossdiff_mat = np.tile(train_lossdiff, (len(batch_indices), 1))
+        batchlossdiff_mat = np.tile(np.expand_dims(batch_lossdiff, 1), (1, self.node_size))
 
-        
         if self.clipping:
             trainlossdiff_mat[trainlossdiff_mat>1] = 1
         
@@ -594,7 +589,7 @@ class InfluenceGraphv4: # 2nd order approaches (Correlation Based)
             
         trainlossmult_mat = trainlossdiff_mat*batchlossdiff_mat
         
-        locations_temp = self.locations[mask_mat==1,:]
+        locations_temp = self.locations[mask_mat==1, :]
         trainlossmult_flat = trainlossmult_mat[mask_mat==1]
         trainlossdiff_flat = trainlossdiff_mat[mask_mat==1]
         batchlossdiff_flat = batchlossdiff_mat[mask_mat == 1]
