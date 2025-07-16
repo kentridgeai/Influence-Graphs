@@ -300,7 +300,6 @@ def test_model(model, testloader):
 
 def update_IG(IG, main_model, batch_indices, old_trainloss, IG_trainloader, train_params, influence_params, logger=None):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    old_trainloss = copy.deepcopy(old_trainloss)
 
     if logger is not None: logger.log("Updating influence graph...", level=2)
     
@@ -322,14 +321,27 @@ def update_IG(IG, main_model, batch_indices, old_trainloss, IG_trainloader, trai
 
     trainloss = torch.zeros(IG.node_size, device=device)
 
+    # Forward pass for full dataset
     with torch.no_grad():
         for inputs, labels, indices in IG_trainloader:
-            inputs = inputs.to(device)
-            labels = labels.to(device)
-            outputs = model(inputs)
-            loss = criterion(outputs, labels.long())
-            trainloss[indices] = loss
+            inputs, labels = inputs.to(device), labels.to(device)
 
+            # Mixed precision if on GPU
+            if use_amp:
+                with torch.autocast(device_type=device):
+                    outputs = model(inputs)
+                    loss = criterion(outputs, labels.long())
+            else:
+                outputs = model(inputs)
+                loss = criterion(outputs, labels.long())
+
+            trainloss[indices] = loss.detach()
+
+            # Free up memory proactively
+            del inputs, labels, outputs, loss
+            if use_amp: torch.cuda.empty_cache()
+
+    # Convert trainloss for numpy operations
     trainloss = trainloss.cpu().numpy()
     batchloss_diff = old_batchloss - trainloss[batch_indices]
     trainloss_diff = old_trainloss - trainloss
@@ -410,13 +422,9 @@ def update_IG(IG, main_model, batch_indices, old_trainloss, IG_trainloader, trai
 
 def estimate_starting_trainloss(model, IG_trainloader, train_params, logger=None):
     
-    # Detect if we’re using CUDA
-    if torch.cuda.is_available():
-        device = 'cuda'
-        use_amp = True
-    else:
-        device = 'cpu'
-        use_amp = False
+    # Detect device and mixed precision
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    use_amp = device == 'cuda'
 
     if logger is not None: logger.log("Estimating starting trainloss...", level=1)
 
@@ -456,13 +464,9 @@ def estimate_starting_trainloss(model, IG_trainloader, train_params, logger=None
 
 def train_model_general(model, trainloader, train_params, logger=None):
     
-    # Detect if we’re using CUDA
-    if torch.cuda.is_available():
-        device = 'cuda'
-        use_amp = True
-    else:
-        device = 'cpu'
-        use_amp = False
+    # Detect device and mixed precision
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    use_amp = device == 'cuda'
 
     if logger is not None:
         logger.log("Training model generally with total params: {}...".format(count_parameters(model)), level=1)
@@ -514,10 +518,6 @@ def train_model_general(model, trainloader, train_params, logger=None):
             mode='triangular',
             gamma=train_params['scheduler']['gamma']
         )
-
-    init_epoch = 0
-    all_train_losses = []
-    train_loss_min = 9999
     
     if train_params['criterion'] == 'BCEWithLogitsLoss':
         criterion = nn.BCEWithLogitsLoss()
@@ -526,19 +526,13 @@ def train_model_general(model, trainloader, train_params, logger=None):
     elif train_params['criterion'] == 'MSELoss':
         criterion = nn.MSELoss() 
 
-    if use_amp:
-        scaler = GradScaler()
-    else:
-        # On CPU, no need for GradScaler
-        scaler = None
+    # Mixed precision scaler
+    scaler = GradScaler() if use_amp else None
     
     for epoch in range(train_params['total_epochs']):
         
         if train_params['disp_epoch'] == True and logger is not None:
             logger.log("Starting epoch: {}...".format(epoch), level=1)
-        
-        train_loss = []
-        loss_weights = [] 
         
         for i, data in enumerate(trainloader, 0):
             # get the inputs
@@ -549,7 +543,7 @@ def train_model_general(model, trainloader, train_params, logger=None):
             if logger is not None:
                 logger.log("Training model with trainloader {} of length {}...".format(i, len(inputs)), level=2)
 
-            optimizer.zero_grad()
+            optimizer.zero_grad(set_to_none=True)
 
             if use_amp:
                 # Mixed precision on GPU
@@ -565,39 +559,24 @@ def train_model_general(model, trainloader, train_params, logger=None):
                 # Standard FP32 on CPU
                 allouts = model(inputs)
                 loss = criterion(allouts, labels.long())
-    
                 loss.backward()
                 optimizer.step()
                 
-            train_loss.append(loss.item())
-            loss_weights.append(len(labels))
-            
         scheduler.step()
-        all_train_losses.append(np.average(np.array(train_loss), weights=np.array(loss_weights)))
-        if train_params['disp_loss_epoch'] == True and logger is not None:
-            logger.log("Training Loss: {}...".format(all_train_losses[-1]), level=1)
-            
-            
-    if train_params['disp_loss_final'] == True and logger is not None:
-        logger.log("Final loss: {}...".format(all_train_losses[-1]), level=1)
       
     if train_params['disp_accuracy_final'] == True:
         logger.log("Accuracy: {}...".format(test_model(model, trainloader)), level=1)
     
     model = model.eval()
-    return model, all_train_losses
+    return model
 
 
 
 def estimate_influencegraph(model, trainloader, IG_trainloader, train_params, influence_params, loader_params, logger=None):
     
-    # Detect if we’re using CUDA
-    if torch.cuda.is_available():
-        device = 'cuda'
-        use_amp = True
-    else:
-        device = 'cpu'
-        use_amp = False
+    # Detect device and mixed precision
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    use_amp = device == 'cuda'
 
     if logger is not None:
         logger.log("Estimating influence graph for model with total params: {}...".format(count_parameters(model)), level=1)
@@ -657,10 +636,6 @@ def estimate_influencegraph(model, trainloader, IG_trainloader, train_params, in
             gamma=train_params['scheduler']['gamma']
         )
 
-    init_epoch = 0
-    all_train_losses = []
-    train_loss_min = 9999
-    
     if train_params['criterion'] == 'BCEWithLogitsLoss':
         criterion = nn.BCEWithLogitsLoss()
         
@@ -672,19 +647,13 @@ def estimate_influencegraph(model, trainloader, IG_trainloader, train_params, in
     
     trainloss = estimate_starting_trainloss(model, IG_trainloader, train_params, logger=logger)
 
-    if use_amp:
-        scaler = GradScaler()
-    else:
-        # On CPU, no need for GradScaler
-        scaler = None
-    
+    # Mixed precision scaler
+    scaler = GradScaler() if use_amp else None
+
     for epoch in range(train_params['total_epochs']):
         
         if train_params['disp_epoch'] == True and logger is not None:
             logger.log("Starting epoch: {}...".format(epoch), level=1)
-         
-        train_loss = []
-        loss_weights = [] 
         
         for i, data in enumerate(trainloader, 0):
             # get the inputs
@@ -695,7 +664,7 @@ def estimate_influencegraph(model, trainloader, IG_trainloader, train_params, in
             if logger is not None:
                 logger.log("Estimating influence graph with trainloader {} of length {}...".format(i, len(inputs)), level=2)
 
-            optimizer.zero_grad()
+            optimizer.zero_grad(set_to_none=True)
 
             if use_amp:
                 # Mixed precision on GPU
@@ -711,31 +680,23 @@ def estimate_influencegraph(model, trainloader, IG_trainloader, train_params, in
                 # Standard FP32 on CPU
                 allouts = model(inputs)
                 loss = criterion(allouts, labels.long())
-    
                 loss.backward()
                 optimizer.step()
-                
-            train_loss.append(loss.item())
-            loss_weights.append(len(labels))
             
             trainloss = update_IG(model_IG, model, indices, trainloss, IG_trainloader, train_params, influence_params, logger=logger)
     
         scheduler.step()
-        
-        all_train_losses.append(
-            np.average(np.array(train_loss), weights=np.array(loss_weights))
-        )
-        if train_params['disp_loss_epoch'] == True and logger is not None:
-            logger.log("Training Loss: {}...".format(all_train_losses[-1]), level=1)
-            
-    if train_params['disp_loss_final'] == True and logger is not None:
-        logger.log("Final loss: {}...".format(all_train_losses[-1]), level=1)
+
+        # Periodic GC to avoid hidden leaks
+        if epoch % 5 == 0:
+            gc.collect()
+            if use_amp: torch.cuda.empty_cache()
       
     if train_params['disp_accuracy_final'] == True:
         logger.log("Accuracy: {}...".format(test_model(model, trainloader)), level=1)
     
     model = model.eval()
-    return model, all_train_losses, model_IG
+    return model, model_IG
 
 
 

@@ -406,7 +406,7 @@ if __name__ == "__main__":
                     graphmat = model_IG.load_graph('IG-DB', loader_params['dataset_name'],'latest')
                     
                 else:
-                    model, all_train_losses, model_IG = estimate_influencegraph(
+                    model, model_IG = estimate_influencegraph(
                         model,
                         trainloader,
                         IG_trainloader,
@@ -457,10 +457,23 @@ if __name__ == "__main__":
                 vis_influencenodes(graphmat, trainloader.dataset.inputs, max_percentile = 3, num_nodes = 25)
                 vis_influencenodes(graphmat, trainloader.dataset.inputs, min_percentile = 97, num_nodes = 25) 
             #
-            logger.log("Main process done.", level=1)
-            
+
+            # -------------- Clean up after each noise_level --------------
+            logger.log("End experiment using noise_type:{}, with noise_level: {}.".format(noise_type, noise_level), level=1)
+            del model, trainloader, testloader, IG_trainloader
+            if 'model_IG' in locals(): del model_IG
+            if 'graphmat' in locals(): del graphmat
             gc.collect()
             torch.cuda.empty_cache()
+
+    # -------------- Stop logger listener cleanly, and cleanup --------------
+    logger.log("Main process done.", level=1)
+    logger.log("Shutting down logger listener...", level=1)
+    log_queue.put(None)  # Sentinel to signal listener shutdown
+    listener.join()
+
+    gc.collect()
+    torch.cuda.empty_cache()
                 
 
         
