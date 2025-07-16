@@ -300,6 +300,7 @@ def test_model(model, testloader):
 
 def update_IG(IG, main_model, batch_indices, old_trainloss, IG_trainloader, train_params, influence_params, logger=None):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    use_amp = device == 'cuda'
 
     if logger is not None: logger.log("Updating influence graph...", level=2)
     
