@@ -408,7 +408,7 @@ def update_IG(IG, main_model, batch_indices, old_trainloss, IG_trainloader, trai
 
 
 
-def estimate_starting_trainloss(model, IG_trainloader, train_params, logger=logger):
+def estimate_starting_trainloss(model, IG_trainloader, train_params, logger=None):
     
     # Detect if we’re using CUDA
     if torch.cuda.is_available():
