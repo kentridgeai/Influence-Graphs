@@ -69,7 +69,8 @@ def add_label_noise(targets, noise_type, noise_level, num_classes):
 
 def genloaders_vision(loader_params, labelnoise_params, image_size=(224, 224)):
 
-    def preprocess_dataset(dataset, is_grayscale=False):
+    def preprocess_dataset(dataset, image_size=(224, 224), is_grayscale=False):
+        
         if isinstance(dataset.data, np.ndarray):
             data = torch.from_numpy(dataset.data)
         else:
@@ -82,10 +83,15 @@ def genloaders_vision(loader_params, labelnoise_params, image_size=(224, 224)):
         else:
             data = data.permute(0, 3, 1, 2)  # [N, H, W, C] → [N, C, H, W]
 
-        targets = torch.tensor(dataset.targets)
-        return data, targets
+        # Resize to target image size
+        data_resized = torch.nn.functional.interpolate(
+            data, size=image_size, mode='bilinear', align_corners=False
+        )
 
-    def preprocess_dataset_from_imagefolder(dataset, image_size=(32, 32)):
+        targets = torch.tensor(dataset.targets)
+        return data_resized, targets
+
+    def preprocess_dataset_from_imagefolder(dataset, image_size=(224, 224)):
         data = []
         targets = []
 
@@ -160,8 +166,16 @@ def genloaders_vision(loader_params, labelnoise_params, image_size=(224, 224)):
     dataset_test_data, dataset_test_targets = None, None
     
     if dataset_name in ['FashionMNIST', 'MNIST', 'CIFAR10', 'CIFAR100']:
-        dataset_data, dataset_targets = preprocess_dataset(train, is_grayscale=is_grayscale)
-        dataset_test_data, dataset_test_targets = preprocess_dataset(test, is_grayscale=is_grayscale)
+        dataset_data, dataset_targets = preprocess_dataset(
+            train,
+            image_size=image_size,
+            is_grayscale=is_grayscale
+        )
+        dataset_test_data, dataset_test_targets = preprocess_dataset(
+            test,
+            image_size=image_size,
+            is_grayscale=is_grayscale
+        )
         
     else:
         dataset_data, dataset_targets = preprocess_dataset_from_imagefolder(train, image_size=image_size)
