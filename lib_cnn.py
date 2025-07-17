@@ -28,10 +28,10 @@ cfg_FC = {
     'ShallowCIFAR10': [128],
     'ShallowfatterCIFAR10': [512],
     
-    'VGG11': [512],
-    'VGG13': [512],
-    'VGG16': [512],
-    'VGG19': [512],
+    'GA_VGG11': [512],
+    'GA_VGG13': [512],
+    'GA_VGG16': [512],
+    'GA_VGG19': [512],
 }
 
 
@@ -117,7 +117,7 @@ class CNN(nn.Module):
 
 
 def test():
-    net = CNN('VGG11')
+    net = CNN('GA_VGG11')
     x = torch.randn(2,3,32,32)
     y = net(x)
     print(y.size())
