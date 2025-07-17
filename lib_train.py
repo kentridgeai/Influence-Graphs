@@ -11,6 +11,7 @@ os.chdir(dir_path)
 
 import matplotlib.pyplot as plt
 import copy
+import gc
 import sys
 import time
 import torch
