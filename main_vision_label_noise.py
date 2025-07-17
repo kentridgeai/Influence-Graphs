@@ -346,17 +346,14 @@ if __name__ == "__main__":
 
             # -------------- Customize arguments based on model --------------
             if dataset == 'MNIST' or dataset == 'FashionMNIST':
-                model_params['name']        = 'ShallowMNIST'
                 model_params['in_channels'] = 1
                 model_params['num_classes'] = 10
             
             elif dataset == 'CIFAR10':
-                model_params['name']        = 'ShallowCIFAR10'
                 model_params['in_channels'] = 3
                 model_params['num_classes'] = 10
             
             elif dataset == 'Flowers102':
-                model_params['name']        = 'ShallowCIFAR10'
                 model_params['in_channels'] = 3
                 model_params['num_classes'] = 102
             
