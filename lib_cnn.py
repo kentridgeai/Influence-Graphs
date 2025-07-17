@@ -62,7 +62,16 @@ class CNN(nn.Module):
         Pass dummy input to compute size of flattened feature map.
         """
         dummy_input = torch.zeros(1, self.in_channels, img_size, img_size)
-        dummy_output = self.features(dummy_input)
+        
+        # Switch to eval mode to avoid BatchNorm error
+        was_training = self.features.training
+        self.features.eval()
+        with torch.no_grad():
+            dummy_output = self.features(dummy_input)
+            
+        # Restore original mode
+        if was_training:
+            self.features.train()
         return dummy_output.view(1, -1).size(1)
 
     def _make_layers(self, cfg):
