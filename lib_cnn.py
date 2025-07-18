@@ -48,6 +48,8 @@ class CNN(nn.Module):
         # Dynamically compute flattened feature size
         flatten_size = self._get_flatten_size(img_size, out_channels)
 
+        print('flatten_size:', flatten_size)
+
         # Build classifier
         self.classifier = self._make_FC(flatten_size, cfg_FC[vgg_name])
         
@@ -62,17 +64,21 @@ class CNN(nn.Module):
         Pass dummy input to compute size of flattened feature map.
         """
         dummy_input = torch.zeros(1, self.in_channels, img_size, img_size)
-        
+
         # Switch to eval mode to avoid BatchNorm error
         was_training = self.features.training
         self.features.eval()
         with torch.no_grad():
             dummy_output = self.features(dummy_input)
-            
+
         # Restore original mode
-        if was_training:
-            self.features.train()
-        return dummy_output.view(1, -1).size(1)
+        if was_training: self.features.train()
+    
+        # If AdaptiveAvgPool2d was applied, the feature map size will be 1x1
+        if dummy_output.dim() == 4 and dummy_output.shape[2:] == (1, 1):
+            return dummy_output.size(1)  # Only channels
+        else:
+            return dummy_output.view(1, -1).size(1)  # Flatten all dims
 
     def _make_layers(self, cfg):
         layers = []
