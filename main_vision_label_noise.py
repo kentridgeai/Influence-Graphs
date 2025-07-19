@@ -49,13 +49,14 @@ os.chdir(dir_path)
 
 
 def add_label_noise(targets, noise_type, noise_level, num_classes):
-    np_targets = targets.numpy()
+    np_targets = targets.cpu().numpy()
     num_noisy = int(noise_level * len(np_targets))
     noisy_indices = np.random.choice(len(np_targets), num_noisy, replace=False)
 
     if noise_type == 'symmetric':
         # Symmetric noise: randomly assign any class
         new_labels = np.random.choice(num_classes, num_noisy)
+        
     elif noise_type == 'asymmetric':
         # Asymmetric noise: shift labels to the next class
         new_labels = np_targets[noisy_indices].copy()
@@ -63,7 +64,7 @@ def add_label_noise(targets, noise_type, noise_level, num_classes):
             new_labels[i] = (np_targets[noisy_indices[i]] + 1) % num_classes
 
     np_targets[noisy_indices] = new_labels
-    return torch.from_numpy(np_targets)
+    return torch.from_numpy(np_targets).to(targets.device)
 
 
 
@@ -386,9 +387,14 @@ if __name__ == "__main__":
             elif dataset == 'Flowers102':
                 model_params['in_channels'] = 3
                 model_params['num_classes'] = 102
-            
+
+            # -------------- Configure model --------------
             if model_params['name'] == 'pretrained_VGG16':
                 model = get_pretrained_vgg16(num_classes=model_params['num_classes'], fine_tune='NEW_LAYERS')
+                
+            elif model_params['name'] == 'pretrained_resnet50':
+                model = get_pretrained_resnet50(num_classes=model_params['num_classes'], fine_tune='NEW_LAYERS')
+                
             else:
                 model = model_params['type'](
                     model_params['name'],

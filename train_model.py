@@ -40,6 +40,26 @@ dir_path = os.path.dirname(os.path.realpath(__file__))
 os.chdir(dir_path)
 
 
+def add_label_noise(targets, noise_type, noise_level, num_classes):
+    np_targets = targets.cpu().numpy()
+    num_noisy = int(noise_level * len(np_targets))
+    noisy_indices = np.random.choice(len(np_targets), num_noisy, replace=False)
+
+    if noise_type == 'symmetric':
+        # Symmetric noise: randomly assign any class
+        new_labels = np.random.choice(num_classes, num_noisy)
+        
+    elif noise_type == 'asymmetric':
+        # Asymmetric noise: shift labels to the next class
+        new_labels = np_targets[noisy_indices].copy()
+        for i in range(num_noisy):
+            new_labels[i] = (np_targets[noisy_indices[i]] + 1) % num_classes
+
+    np_targets[noisy_indices] = new_labels
+    return torch.from_numpy(np_targets).to(targets.device)
+
+
+
 def genloaders_vision_test(loader_params, labelnoise_params, image_size=(224, 224)):
 
     def preprocess_dataset(dataset, is_grayscale=False):
@@ -220,6 +240,7 @@ if __name__ == "__main__":
     parser.add_argument('--model_name', type=str, default='ShallowMNIST', help='Model for experiment')
     parser.add_argument('--root_folder', type=str, default='../data', help='Root folder for data')
     parser.add_argument('--noise_type', type=str, default='symmetric', choices=['symmetric', 'asymmetric', 'none'], help='Type of label noise')
+    parser.add_argument('--noise_level', type=float, default=0.0, help='Level of label noise')
     parser.add_argument('--program_mode', type=str, default='normal', choices=['normal', 'GT'], help='Run mode')
     parser.add_argument('--save_mode', type=str, default='load', choices=['load', 'store', 'none'], help='Save or load influence graph')
     parser.add_argument('--visualize', action='store_true', help='Enable visualization of influence pairs')
@@ -245,7 +266,7 @@ if __name__ == "__main__":
     save_mode    = args.save_mode # store, load or none
     visualize    = args.visualize
     noise_type   = args.noise_type
-    noise_level  = 0
+    noise_level  = args.noise_level
     num_workers  = args.num_workers
     img_size     = args.img_size
 
@@ -268,7 +289,7 @@ if __name__ == "__main__":
         'root_folder':      root_folder,
         'training_size':    'full', # 'full'
         'batch_size':       32,   # 20-40
-        'IG_batch_size':    400, 
+        'IG_batch_size':    1000, 
         'transform':        None,
         'add_singleton':    False,
         'convert_to_torch': False,
@@ -296,7 +317,7 @@ if __name__ == "__main__":
         'weight_decay':        1e-4,
         'scheduler': {
             'name':            'StepLR',
-            'step_size':       6,
+            'step_size':       20,
             'gamma':           0.3
         },
         'criterion':           'CrossEntropyLoss',
@@ -346,9 +367,14 @@ if __name__ == "__main__":
     elif dataset == 'Flowers102':
         model_params['in_channels'] = 3
         model_params['num_classes'] = 102
-    
+
+    # -------------- Configure model --------------
     if model_params['name'] == 'pretrained_VGG16':
         model = get_pretrained_vgg16(num_classes=model_params['num_classes'], fine_tune='NEW_LAYERS')
+
+    elif model_params['name'] == 'pretrained_resnet50':
+        model = get_pretrained_resnet50(num_classes=model_params['num_classes'], fine_tune='NEW_LAYERS')
+        
     else:
         model = model_params['type'](
             model_params['name'],
