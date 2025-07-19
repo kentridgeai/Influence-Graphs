@@ -6,6 +6,8 @@ Created on Thu Jan  9 15:32:52 2025
 """
 import torch
 import torch.nn as nn
+import torchvision
+import torchvision.models as models
 
 
 cfg_feat = {
@@ -131,6 +133,64 @@ class CNN(nn.Module):
     
 
 
+def get_pretrained_vgg16(num_classes=1000, fine_tune='NEW_LAYERS'):
+    # Load VGG16 pretrained model
+    model = models.vgg16_bn(weights=torchvision.models.VGG16_BN_Weights.IMAGENET1K_V1)
+
+    # Replace the classifier (fc layers)
+    in_features = model.classifier[6].in_features
+    model.classifier[6] = nn.Linear(in_features, num_classes)
+
+    # Freeze all parameters
+    for p in model.parameters(): p.requires_grad = False
+    
+    # Unfreeze parameters based on fine_tune
+    if fine_tune == 'NEW_LAYERS':
+        for l in [model.classifier[6]]:
+            for p in l.parameters():
+                p.requires_grad = True
+
+    elif fine_tune == 'CLASSIFIER':
+        for l in [model.classifier]:
+            for p in l.parameters():
+                p.requires_grad = True
+
+    else:
+        for p in m.parameters():
+            p.requires_grad = True
+
+    return model
+
+
+def get_pretrained_resnet50(num_classes=1000, fine_tune='NEW_LAYERS'):
+    # Load Resnet50 pretrained model
+    model = models.resnet50(weights=torchvision.models.ResNet50_Weights.IMAGENET1K_V2)
+
+    # Replace the fully connected layer
+    in_features = model.fc.in_features  # 2048 for ResNet50
+    model.fc = nn.Linear(in_features, num_classes)
+
+    # Freeze all parameters
+    for p in model.parameters(): p.requires_grad = False
+    
+    # Unfreeze parameters based on fine_tune
+    if fine_tune == 'NEW_LAYERS':
+        for l in [model.fc]:
+            for p in l.parameters():
+                p.requires_grad = True
+
+    elif fine_tune == 'CLASSIFIER':
+        for l in [model.fc]:
+            for p in l.parameters():
+                p.requires_grad = True
+
+    else:
+        for p in m.parameters():
+            p.requires_grad = True
+
+    return model
+
+    
 def test():
     net = CNN('GA_VGG11')
     x = torch.randn(2,3,32,32)

@@ -299,6 +299,105 @@ def test_model(model, testloader):
 
 
 
+def get_learning_config(model, train_params, config=None):
+    options = []
+    if config == 'pretrained_VGG16':
+        # For vgg16, we start with a learning rate of 1e-3 for the last layer, and
+        # decay it to 1e-7 at the first conv layer. The intermediate rates are
+        # decayed linearly.
+        lr = 0.0001
+        options.append({
+            'params': model.classifier.parameters(),
+            'lr': lr,
+        })
+        final_lr = lr / 1000.0
+        diff_lr = final_lr - lr
+        lr_step = diff_lr / 44.0
+        for i in range(43, -1, -1):
+            options.append({
+                'params': model.features[i].parameters(),
+                'lr': lr + lr_step * (44-i)
+            })
+
+        optimizer = torch.optim.Adam(options, lr=1e-8)
+        # Every 2 steps reduce the LR to 70% of the previous value.
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=2, gamma=0.7)
+            
+    elif config == 'pretrained_Resnet50':
+        # For the resnet class of models, we decay the LR exponentially and reduce
+        # it to a third of the previous value at each step.
+        layers = ['conv1', 'bn1', 'layer1', 'layer2', 'layer3', 'layer4', 'fc']
+        lr = 0.0001
+        for layer_name in reversed(layers):
+            options.append({
+                "params": getattr(model, layer_name).parameters(),
+                'lr': lr,
+            })
+            lr = lr / 3.0
+
+        optimizer = optim.Adam(options, lr=1e-8)
+        # Every 2 steps reduce the LR to 70% of the previous value.
+        scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=2, gamma=0.7)
+
+    else:
+        if train_params['optimizer'] == 'SGD':
+            optimizer = optim.SGD(
+                model.parameters(),
+                lr=train_params['init_rate'],
+                momentum=0.9,
+                weight_decay=train_params['weight_decay']
+            )
+        elif train_params['optimizer'] == 'Adam':
+            optimizer = optim.Adam(
+                model.parameters(),
+                lr=train_params['init_rate'],
+                weight_decay=train_params['weight_decay']
+            )
+        elif train_params['optimizer'] == 'AdamW':
+            optimizer = optim.AdamW(
+                model.parameters(),
+                lr=train_params['init_rate'],
+                weight_decay=train_params['weight_decay']
+            )
+            
+        scheduler = optim.lr_scheduler.ConstantLR(optimizer, factor=1.0)
+
+        if train_params['scheduler']['name'] == 'StepLR': 
+            scheduler = optim.lr_scheduler.StepLR(
+                optimizer,
+                step_size=train_params['scheduler']['step_size'],
+                gamma= train_params['scheduler']['gamma']
+            )
+        elif train_params['scheduler']['name'] == 'MultiStepLR': 
+            scheduler = optim.lr_scheduler.MultiStepLR(
+                optimizer,
+                milestones=train_params['scheduler']['milestones'],
+                gamma= train_params['scheduler']['gamma']
+            )
+        elif train_params['scheduler']['name'] == 'CyclicLR':
+            scheduler = optim.lr_scheduler.CyclicLR(
+                optimizer,
+                train_params['init_rate'],
+                train_params['scheduler']['max_lr'],
+                train_params['scheduler']['step_size'],
+                step_size_down=train_params['scheduler']['step_size'],
+                mode='triangular',
+                gamma=train_params['scheduler']['gamma']
+            )
+
+    if train_params['criterion'] == 'BCEWithLogitsLoss':
+        criterion = nn.BCEWithLogitsLoss()
+        
+    elif train_params['criterion'] == 'CrossEntropyLoss':
+        criterion = nn.CrossEntropyLoss()
+        
+    elif train_params['criterion'] == 'MSELoss':
+        criterion = nn.MSELoss()
+        
+    return optimizer, scheduler, criterion
+
+
+
 def update_IG(IG, main_model, batch_indices, old_trainloss, IG_trainloader, train_params, influence_params, logger=None):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     use_amp = device == 'cuda'
@@ -464,7 +563,7 @@ def estimate_starting_trainloss(model, IG_trainloader, train_params, logger=None
     
 
 
-def train_model_general(model, trainloader, train_params, logger=None):
+def train_model_general(model, trainloader, train_params, config=None, logger=None):
     
     # Detect device and mixed precision
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -476,57 +575,7 @@ def train_model_general(model, trainloader, train_params, logger=None):
     model = model.to(device)
     model = model.train()
     
-    if train_params['optimizer'] == 'SGD':
-        optimizer = optim.SGD(
-            model.parameters(),
-            lr=train_params['init_rate'],
-            momentum=0.9,
-            weight_decay=train_params['weight_decay']
-        )
-    elif train_params['optimizer'] == 'Adam':
-        optimizer = optim.Adam(
-            model.parameters(),
-            lr=train_params['init_rate'],
-            weight_decay=train_params['weight_decay']
-        )
-    elif train_params['optimizer'] == 'AdamW':
-        optimizer = optim.AdamW(
-            model.parameters(),
-            lr=train_params['init_rate'],
-            weight_decay=train_params['weight_decay']
-        )
-            
-    scheduler = optim.lr_scheduler.ConstantLR(optimizer, factor=1.0)
-    
-    if train_params['scheduler']['name'] == 'StepLR': 
-        scheduler = optim.lr_scheduler.StepLR(
-            optimizer,
-            step_size=train_params['scheduler']['step_size'],
-            gamma= train_params['scheduler']['gamma']
-        )
-    elif train_params['scheduler']['name'] == 'MultiStepLR': 
-        scheduler = optim.lr_scheduler.MultiStepLR(
-            optimizer,
-            milestones=train_params['scheduler']['milestones'],
-            gamma= train_params['scheduler']['gamma']
-        )
-    elif train_params['scheduler']['name'] == 'CyclicLR':
-        scheduler = optim.lr_scheduler.CyclicLR(
-            optimizer,
-            train_params['init_rate'],
-            train_params['scheduler']['max_lr'],
-            train_params['scheduler']['step_size'],
-            step_size_down=train_params['scheduler']['step_size'],
-            mode='triangular',
-            gamma=train_params['scheduler']['gamma']
-        )
-    
-    if train_params['criterion'] == 'BCEWithLogitsLoss':
-        criterion = nn.BCEWithLogitsLoss()
-    elif train_params['criterion'] == 'CrossEntropyLoss':
-        criterion = nn.CrossEntropyLoss() 
-    elif train_params['criterion'] == 'MSELoss':
-        criterion = nn.MSELoss() 
+    optimizer, scheduler, criterion = get_learning_config(model, train_params, config=config)
 
     # Mixed precision scaler
     scaler = GradScaler() if use_amp else None
@@ -535,6 +584,7 @@ def train_model_general(model, trainloader, train_params, logger=None):
         
         if train_params['disp_epoch'] == True and logger is not None:
             logger.log("Starting epoch: {}...".format(epoch), level=1)
+            logger.log("Accuracy: {}...".format(test_model(model, trainloader)), level=1)
         
         for i, data in enumerate(trainloader, 0):
             # get the inputs
@@ -574,7 +624,7 @@ def train_model_general(model, trainloader, train_params, logger=None):
 
 
 
-def estimate_influencegraph(model, trainloader, IG_trainloader, train_params, influence_params, loader_params, logger=None):
+def estimate_influencegraph(model, trainloader, IG_trainloader, train_params, influence_params, loader_params, config=None, logger=None):
     
     # Detect device and mixed precision
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -593,64 +643,11 @@ def estimate_influencegraph(model, trainloader, IG_trainloader, train_params, in
     model = model.to(device)
     model = model.train()
     
-    if train_params['optimizer'] == 'SGD':
-        optimizer = optim.SGD(
-            model.parameters(),
-            lr=train_params['init_rate'],
-            momentum=0.9,
-            weight_decay=train_params['weight_decay']
-        )
-    elif train_params['optimizer'] == 'Adam':
-        optimizer = optim.Adam(
-            model.parameters(),
-            lr=train_params['init_rate'],
-            weight_decay=train_params['weight_decay']
-        )
-    elif train_params['optimizer'] == 'AdamW':
-        optimizer = optim.AdamW(
-            model.parameters(),
-            lr=train_params['init_rate'],
-            weight_decay=train_params['weight_decay']
-        )
-            
-    scheduler = optim.lr_scheduler.ConstantLR(optimizer, factor=1.0)
-    
-    if train_params['scheduler']['name'] == 'StepLR': 
-        scheduler = optim.lr_scheduler.StepLR(
-            optimizer,
-            step_size=train_params['scheduler']['step_size'],
-            gamma= train_params['scheduler']['gamma']
-        )
-    elif train_params['scheduler']['name'] == 'MultiStepLR': 
-        scheduler = optim.lr_scheduler.MultiStepLR(
-            optimizer,
-            milestones=train_params['scheduler']['milestones'],
-            gamma= train_params['scheduler']['gamma']
-        )
-    elif train_params['scheduler']['name'] == 'CyclicLR':
-        scheduler = optim.lr_scheduler.CyclicLR(
-            optimizer,
-            train_params['init_rate'],
-            train_params['scheduler']['max_lr'],
-            train_params['scheduler']['step_size'],
-            step_size_down=train_params['scheduler']['step_size'],
-            mode='triangular',
-            gamma=train_params['scheduler']['gamma']
-        )
-
-    if train_params['criterion'] == 'BCEWithLogitsLoss':
-        criterion = nn.BCEWithLogitsLoss()
-        
-    elif train_params['criterion'] == 'CrossEntropyLoss':
-        criterion = nn.CrossEntropyLoss()
-        
-    elif train_params['criterion'] == 'MSELoss':
-        criterion = nn.MSELoss()
-    
     trainloss = estimate_starting_trainloss(model, IG_trainloader, train_params, logger=logger)
 
     # Mixed precision scaler
     scaler = GradScaler() if use_amp else None
+    optimizer, scheduler, criterion = get_learning_config(model, train_params, config=config)
 
     for epoch in range(train_params['total_epochs']):
         
