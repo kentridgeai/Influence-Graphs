@@ -239,7 +239,6 @@ def prerequisites():
     if torch.cuda.is_available():
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
-        torch.set_default_tensor_type('torch.cuda.FloatTensor')
         torch.cuda.empty_cache()
 
 
@@ -262,6 +261,8 @@ if __name__ == "__main__":
     parser.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu', help='Device to use')
     parser.add_argument('--num_workers', type=int, default=0, help='Number of workers for loaders')
     parser.add_argument('--img_size', type=int, default=32, help='Size to resize input image to')
+    parser.add_argument('--config', type=str, default='none', choices=['pretrained_VGG16', 'pretrained_Resnet50', 'none'],
+                        help='Learning config to use')
     parser.add_argument('--log_verbosity', type=int, default=1, help='log message verbosity (0=critical, 1=info, 2=debug)')
     args = parser.parse_args()
 
@@ -284,6 +285,7 @@ if __name__ == "__main__":
     noise_levels = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
     num_workers  = args.num_workers
     img_size     = args.img_size
+    config       = args.config
 
     # -------------- Device Setup --------------
     DEVICE = torch.device(args.device)
@@ -372,10 +374,11 @@ if __name__ == "__main__":
                 'num_classes':         10,
                 'img_size':            img_size,
                 'batchnorm':           True,
+                'fine_tune':           'NEW_LAYERS',
             }
 
             
-            # -------------- Customize arguments based on model --------------
+            # -------------- Customize arguments based on dataset --------------
             if dataset == 'MNIST' or dataset == 'FashionMNIST':
                 model_params['in_channels'] = 1
                 model_params['num_classes'] = 10
@@ -388,21 +391,8 @@ if __name__ == "__main__":
                 model_params['in_channels'] = 3
                 model_params['num_classes'] = 102
 
-            # -------------- Configure model --------------
-            if model_params['name'] == 'pretrained_VGG16':
-                model = get_pretrained_vgg16(num_classes=model_params['num_classes'], fine_tune='NEW_LAYERS')
-                
-            elif model_params['name'] == 'pretrained_resnet50':
-                model = get_pretrained_resnet50(num_classes=model_params['num_classes'], fine_tune='NEW_LAYERS')
-                
-            else:
-                model = model_params['type'](
-                    model_params['name'],
-                    in_channels = model_params['in_channels'],
-                    num_classes = model_params['num_classes'],
-                    img_size    = model_params['img_size'],
-                    batchnorm   = model_params['batchnorm']
-                )
+
+            model = get_model_from_params(model_params)
 
             image_size = (img_size, img_size)
             trainloader, testloader, IG_trainloader = genloaders_vision(
@@ -412,82 +402,54 @@ if __name__ == "__main__":
             )
 
             logger.log("Dataloaders generated, starting influence computation for program_mode {}...".format(program_mode), level=1)
-            
-            if program_mode == 'GT':
-                if save_mode == 'load':
-                    node_size = trainloader.dataset.inputs.shape[0]            
-                    IG_GT = InfluenceGraph_GT(
-                        node_size,
-                        trainloader.dataset.labels.squeeze().cpu().numpy(),
-                        trainloader.batch_size,influence_GT_params
-                    )
-                    graphmat = IG_GT.load_graph('IG-DB', loader_params['dataset_name'], 'latest')
-                    
-                else:            
-                    IG_GT = batch_influence_GT(
-                        model_params,
-                        trainloader,
-                        IG_trainloader,
-                        influence_GT_params,
-                        influence_GT_train_params,
-                        loader_params
-                    )
-                    IG_GT.store_graph('IG-DB', loader_params, influence_GT_params, influence_GT_train_params)
-                    graphmat = IG_GT.normgraph_mat
-                
-            elif program_mode == 'normal':
-                if save_mode == 'load':
-                    model_IG = influence_params['graph_type'](
+
+            if save_mode == 'load':
+                IG_GT = influence_params['graph_type'](
                         trainloader.dataset.inputs.shape[0],
                         trainloader.dataset.labels.squeeze().cpu().numpy(),
                         loader_params['batch_size'],
                         influence_params
                     )
-                    graphmat = model_IG.load_graph('IG-DB', loader_params['dataset_name'],'latest')
-                    
-                else:
-                    model, model_IG = estimate_influencegraph(
-                        model,
-                        trainloader,
-                        IG_trainloader,
-                        train_params,
-                        influence_params,
-                        loader_params,
-                        logger=logger
-                    )
-                    test_accuracy = test_model(model, testloader)
-        
-                    model_IG.update_normalized_graph()
-                    graphmat = model_IG.normgraph_mat
-                    
-                    mean_in_degree = np.mean(graphmat.max(axis=0))
-                    if save_mode == 'store':
-                        new_model_params = {
-                        k: v.__name__ if isinstance(v, type) else v for k, v in model_params.items()
-                    }
-                        new_influence_params = {
-                        k: v.__name__ if isinstance(v, type) else v for k, v in influence_params.items()
-                    }
-                        params_dict = {
-                            'labelnoise_params': labelnoise_params,
-                            'loader_params': loader_params,
-                            'influence_params': new_influence_params,
-                            'train_params': train_params,
-                            'model_params': new_model_params,
-                            'test_accuracy': test_accuracy,
-                            'mean_in_degree': mean_in_degree, 
-                        }
+                graphmat = IG_GT.load_graph('IG-DB', loader_params['dataset_name'], 'latest')
+            else:
+                IG_GT = batch_influence_GT(
+                    model_params,
+                    trainloader,
+                    IG_trainloader,
+                    influence_GT_params,
+                    influence_GT_train_params,
+                    loader_params,
+                    config=config,
+                    logger=logger
+                )
+                IG_GT.store_graph('IG-DB', loader_params, influence_GT_params, influence_GT_train_params)
+                graphmat = IG_GT.normgraph_mat
+                
+                mean_in_degree = np.mean(graphmat.max(axis=0))
+                logger.log("Mean In Degree: {}".format(mean_in_degree), level=1)
+                
+                new_model_params = {
+                    k: v.__name__ if isinstance(v, type) else v for k, v in model_params.items()
+                }
+                new_influence_params = {
+                    k: v.__name__ if isinstance(v, type) else v for k, v in influence_params.items()
+                }
+                params_dict = {
+                    'labelnoise_params': labelnoise_params,
+                    'loader_params':     loader_params,
+                    'influence_params':  new_influence_params,
+                    'train_params':      train_params,
+                    'model_params':      new_model_params,
+                    'mean_in_degree':    mean_in_degree, 
+                }
 
-                        logger.log("Test Accuracy: {}".format(test_accuracy), level=1)
-                        logger.log("Mean In Degree: {}".format(mean_in_degree), level=2)
-                        
-                        folder_name = os.path.join('Label noise', loader_params['dataset_name']+' (alpha values zero mean 5k)')
-                        if not os.path.exists(folder_name):
-                            os.makedirs(folder_name)
-                        
-                        # Modify the filename
-                        filename = os.path.join(folder_name, labelnoise_params['noise_type'] + str(labelnoise_params['noise_level']))
-                        save_params_and_matrix(filename, params_dict, graphmat)
+                folder_name = os.path.join('Label noise', loader_params['dataset_name'])
+                if not os.path.exists(folder_name):
+                    os.makedirs(folder_name)
+
+                # Modify the filename
+                filename = os.path.join(folder_name, labelnoise_params['noise_type'] + str(labelnoise_params['noise_level']))
+                save_params_and_matrix(filename, params_dict, graphmat)
         
             #
             if visualize:

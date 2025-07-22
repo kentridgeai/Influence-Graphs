@@ -253,7 +253,7 @@ class InfluenceGraphv4: # 2nd order approaches (Correlation Based)
         row_idx, col_idx = np.where(mask_mat)
     
         # Calculate loss multipliers
-        trainlossdiff_mat = train_lossdiff[row_idx]
+        trainlossdiff_mat = train_lossdiff[col_idx]
         batchlossdiff_mat = batch_lossdiff[row_idx]
 
         if self.clipping:
@@ -274,7 +274,7 @@ class InfluenceGraphv4: # 2nd order approaches (Correlation Based)
     
     def prune_graph(self, abs_threshold):
         
-        x,y = self.normgraph_mat.nonzero()
+        x, y = self.normgraph_mat.nonzero()
         vals = self.normgraph_mat.data
         indices = np.abs(vals)>abs_threshold
         filtered_vals = vals[indices]
@@ -305,7 +305,7 @@ class InfluenceGraphv4: # 2nd order approaches (Correlation Based)
         files = os.listdir()
         
         ID = str(1+int(len(files)/2))
-        sparse.save_npz(ID+".npz", self.normgraph_mat)
+        sparse.save_npz(ID + ".npz", self.normgraph_mat)
         with open(ID +'.pkl', 'wb') as handle:
             pickle.dump(
                 [
@@ -333,7 +333,7 @@ class InfluenceGraphv4: # 2nd order approaches (Correlation Based)
             ID = str(int(len(files)/2))
             print("File ID:", ID)
             
-        self.normgraph_mat = sparse.load_npz(str(ID)+".npz")
+        self.normgraph_mat = sparse.load_npz(str(ID) + ".npz")
         
         os.chdir('..')
         os.chdir('..')

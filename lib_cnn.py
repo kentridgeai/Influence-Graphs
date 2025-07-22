@@ -162,6 +162,7 @@ def get_pretrained_vgg16(num_classes=1000, fine_tune='NEW_LAYERS'):
     return model
 
 
+
 def get_pretrained_resnet50(num_classes=1000, fine_tune='NEW_LAYERS'):
     # Load Resnet50 pretrained model
     model = models.resnet50(weights=torchvision.models.ResNet50_Weights.IMAGENET1K_V2)
@@ -189,6 +190,27 @@ def get_pretrained_resnet50(num_classes=1000, fine_tune='NEW_LAYERS'):
             p.requires_grad = True
 
     return model
+
+
+
+def get_model_from_params(model_params):
+    fine_tune = model_params['fine_tune']
+    
+    if model_params['name'] == 'pretrained_VGG16':
+        return get_pretrained_vgg16(num_classes=model_params['num_classes'], fine_tune=fine_tune)
+        
+    elif model_params['name'] == 'pretrained_resnet50':
+        return get_pretrained_resnet50(num_classes=model_params['num_classes'], fine_tune=fine_tune)
+        
+    else:
+        return model_params['type'](
+            model_params['name'],
+            in_channels = model_params['in_channels'],
+            num_classes = model_params['num_classes'],
+            img_size    = model_params['img_size'],
+            batchnorm   = model_params['batchnorm']
+        )
+    
 
     
 def test():

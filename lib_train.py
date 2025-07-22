@@ -6,9 +6,6 @@ Created on Tue Jan  7 11:48:11 2025
 """
 
 import os
-dir_path = os.path.dirname(os.path.realpath(__file__))
-os.chdir(dir_path)
-
 import matplotlib.pyplot as plt
 import copy
 import gc
@@ -20,15 +17,21 @@ import torch.optim as optim
 import torch.nn as nn
 import torchvision
 
+from collections import defaultdict
 from datetime import datetime
 from multiprocessing import Queue, Process, current_process
 from torch.utils import data
+from torch.utils.data import DataLoader, Subset
 from torchvision import datasets
 from torch.cuda.amp import GradScaler
 from torch import autocast
-from contextlib import nullcontext
+
 from lib_graph import * 
 from lib_preprocessing import *
+
+
+dir_path = os.path.dirname(os.path.realpath(__file__))
+os.chdir(dir_path)
 
 
 
@@ -38,12 +41,9 @@ class Dataset_v2(data.Dataset):
     def __init__(self, inputs, labels, transform=None):
         # 'Initialization'
         self.labels = labels
-        # self.list_IDs = list_IDs
         self.inputs = inputs
-
         self.transform = transform
         
-
     def __len__(self):
         # 'Denotes the total number of samples'
         return self.inputs.shape[0]
@@ -296,6 +296,27 @@ def test_model(model, testloader):
     
     accuracy = float(correct) / float(len(testloader.dataset.labels))
     return accuracy
+
+
+
+def get_labelwise_loaders(IG_trainloader, loader_params):
+    label_to_indices = defaultdict(list)
+
+    for idx in range(len(IG_trainloader.dataset)):
+        _, label, _ = IG_trainloader.dataset[idx]
+        label_to_indices[int(label)].append(idx)
+
+    label_to_loader = {}
+    for label, indices in label_to_indices.items():
+        subset = Subset(IG_trainloader.dataset, indices)
+        loader = torch.utils.data.DataLoader(
+            subset,
+            batch_size=loader_params['IG_batch_size'],
+            num_workers=loader_params['num_workers']
+        )
+        label_to_loader[label] = loader
+        
+    return label_to_loader
 
 
 
@@ -616,7 +637,7 @@ def train_model_general(model, trainloader, train_params, config=None, logger=No
                 
         scheduler.step()
       
-    if train_params['disp_accuracy_final'] == True:
+    if train_params['disp_accuracy_final'] == True and logger is not None:
         logger.log("Accuracy: {}...".format(test_model(model, trainloader)), level=1)
     
     model = model.eval()
@@ -657,8 +678,7 @@ def estimate_influencegraph(model, trainloader, IG_trainloader, train_params, in
         for i, data in enumerate(trainloader, 0):
             # get the inputs
             inputs, labels, indices = data
-            inputs = inputs.to(device)
-            labels = labels.to(device)
+            inputs, labels = inputs.to(device), labels.to(device)
 
             if logger is not None:
                 logger.log("Estimating influence graph with trainloader {} of length {}...".format(i, len(inputs)), level=2)
@@ -691,7 +711,7 @@ def estimate_influencegraph(model, trainloader, IG_trainloader, train_params, in
             gc.collect()
             if use_amp: torch.cuda.empty_cache()
       
-    if train_params['disp_accuracy_final'] == True:
+    if train_params['disp_accuracy_final'] == True and logger is not None:
         logger.log("Accuracy: {}...".format(test_model(model, trainloader)), level=1)
     
     model = model.eval()
