@@ -310,8 +310,8 @@ if __name__ == "__main__":
                 'conversion':       'none',
                 'root_folder':      root_folder,
                 'training_size':    'full', # 'full'
-                'batch_size':       40,   # 20-40
-                'IG_batch_size':    400, 
+                'batch_size':       16,   # 20-40
+                'IG_batch_size':    1000, 
                 'transform':        None,
                 'add_singleton':    False,
                 'convert_to_torch': False,
@@ -339,7 +339,7 @@ if __name__ == "__main__":
                 'weight_decay':        1e-4,
                 'scheduler': {
                     'name':            'StepLR',
-                    'step_size':       6,
+                    'step_size':       16,
                     'gamma':           0.3
                 },
                 'criterion':           'CrossEntropyLoss',
