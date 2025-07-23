@@ -114,7 +114,7 @@ def batch_influence_GT(model_params,
     elif influence_GT_train_params['criterion'] == 'MSELoss':
         criterion = nn.MSELoss()
 
-    trainloss = torch.zeros(IG.node_size, device=device)
+    trainloss = torch.zeros(IG_GT.node_size, device=device)
 
     model = get_model_from_params(model_params)
     model = model.to(device)
