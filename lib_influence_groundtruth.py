@@ -16,6 +16,7 @@ import torch.optim as optim
 from scipy import sparse
 from scipy.sparse import csr_matrix
 from torch import autocast
+from torch.cuda.amp import GradScaler
 
 from lib_cnn import *
 from lib_train import *
@@ -28,12 +29,13 @@ os.chdir(dir_path)
 
 def update_IG_GT(IG, main_model, batch_indices, old_trainloss, IG_trainloader, train_params, labelwise_loaders, logger=None):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    use_amp = device == 'cuda'
     
     old_trainloss = copy.deepcopy(old_trainloss)
     model = copy.deepcopy(main_model)
     model = model.eval()
     
-    trainloss = np.zeros(IG.node_size)
+    trainloss = torch.zeros(IG.node_size, device=device)
     batch_indices = batch_indices.cpu()
     old_batchloss = old_trainloss[batch_indices]
     
@@ -57,9 +59,15 @@ def update_IG_GT(IG, main_model, batch_indices, old_trainloss, IG_trainloader, t
             for inputs, labels, indices in loader:
                 inputs, labels = inputs.to(device), labels.to(device)
                 
-                with torch.autocast(device_type=device):
+                # Mixed precision if on GPU
+                if use_amp:
+                    with torch.autocast(device_type=device):
+                        outputs = model(inputs)
+                        loss = criterion(outputs, labels.long())
+                else:
                     outputs = model(inputs)
                     loss = criterion(outputs, labels.long())
+    
                 trainloss[indices.cpu()] = loss.cpu()
             
     batchloss_diff = old_batchloss - trainloss[batch_indices]
@@ -85,6 +93,7 @@ def batch_influence_GT(model_params,
                        config=None,
                        logger=None):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    use_amp = device == 'cuda'
     
     node_size = trainloader.dataset.inputs.shape[0]
     
@@ -105,22 +114,27 @@ def batch_influence_GT(model_params,
     elif influence_GT_train_params['criterion'] == 'MSELoss':
         criterion = nn.MSELoss()
 
-    trainloss = np.zeros(node_size)
+    trainloss = torch.zeros(IG.node_size, device=device)
 
     model = get_model_from_params(model_params)
     model = model.to(device)
-    model = model.half()
     
     with torch.no_grad():
         for inputs, labels, indices in IG_trainloader:
             inputs, labels = inputs.to(device), labels.to(device)
-            with torch.autocast(device_type=device):
-                allouts = model(inputs)
-                loss = criterion(allouts, labels.long())
-            trainloss[indices.cpu()] = loss.cpu() 
 
+            # Mixed precision if on GPU
+            if use_amp:
+                with torch.autocast(device_type=device):
+                    outputs = model(inputs)
+                    loss = criterion(outputs, labels.long())
+            else:
+                outputs = model(inputs)
+                loss = criterion(outputs, labels.long())
+
+            trainloss[indices.cpu()] = loss.cpu()
+            
     for epoch in range(influence_GT_params['training_iterations']):
-
         if logger is not None:
             logger.log("Starting batch influence_GT iteration: {}...".format(epoch), level=1)
 
@@ -128,24 +142,38 @@ def batch_influence_GT(model_params,
             inputs, labels = inputs.to(device), labels.to(device)
                 
             model = get_model_from_params(model_params)
-            
+
+            # Mixed precision scaler
+            scaler = GradScaler() if use_amp else None
             optimizer, scheduler, criterion = get_learning_config(model, influence_GT_train_params, config=config)
 
             model = model.to(device)
             model = model.train()
-            model = model.half()
             
             for mini_epoch in range(influence_GT_train_params['total_epochs']):
                 
                 if influence_GT_train_params['disp_epoch'] == True and logger is not None:
                     logger.log("Mini batch influence_GT iteration: {}...".format(mini_epoch), level=2)
                 
-                optimizer.zero_grad()
-                with torch.autocast(device_type=device):
+                optimizer.zero_grad(set_to_none=True)
+
+                if use_amp:
+                    # Mixed precision on GPU
+                    with torch.autocast(device_type=device):
+                        allouts = model(inputs)
+                        loss = criterion(allouts, labels.long())
+        
+                    # Scale gradients for FP16
+                    scaler.scale(loss).backward()
+                    scaler.step(optimizer)
+                    scaler.update()
+                else:
+                    # Standard FP32 on CPU
                     allouts = model(inputs)
-                    loss = criterion(allouts, labels.long()) 
-                loss.backward()
-                optimizer.step()
+                    loss = criterion(allouts, labels.long())
+                    loss.backward()
+                    optimizer.step()
+                
                 scheduler.step()
                 
             IG_GT, mean_trainloss = update_IG_GT(

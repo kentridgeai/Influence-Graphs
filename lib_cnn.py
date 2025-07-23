@@ -50,8 +50,6 @@ class CNN(nn.Module):
         # Dynamically compute flattened feature size
         flatten_size = self._get_flatten_size(img_size, out_channels)
 
-        print('flatten_size:', flatten_size)
-
         # Build classifier
         self.classifier = self._make_FC(flatten_size, cfg_FC[vgg_name])
         
