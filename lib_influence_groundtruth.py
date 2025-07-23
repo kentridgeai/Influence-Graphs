@@ -79,9 +79,12 @@ def update_IG_GT(IG, main_model, batch_indices, old_trainloss, IG_trainloader, t
     scale_ref      = torch.sqrt(torch.mean(scale_ref**2))
     batchloss_diff = batchloss_diff / scale_ref
     trainloss_diff = trainloss_diff / scale_ref
-    
-    IG.update_influence_graph(batch_indices, batchloss_diff, trainloss_diff)
-    
+
+    IG.update_influence_graph(
+        batch_indices,
+        batchloss_diff.cpu().numpy(),
+        trainloss_diff.cpu().numpy()
+    )
     return IG, np.mean(trainloss[batch_indices.cpu()])
 
 
