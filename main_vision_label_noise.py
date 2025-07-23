@@ -87,18 +87,6 @@ def genloaders_vision(loader_params, labelnoise_params, image_size=(224, 224), l
         targets = torch.tensor(dataset.targets)
         return data, targets
 
-    # def preprocess_dataset_from_imagefolder(dataset):
-    #     data = []
-    #     targets = []
-
-    #     for img, label in dataset:
-    #         data.append(img)
-    #         targets.append(label)
-
-    #     data = torch.stack(data)
-    #     targets = torch.tensor(targets)
-    #     return data, targets
-
     def preprocess_dataset_from_imagefolder(dataset, save_path=None):
         data = []
         targets = []
@@ -153,19 +141,19 @@ def genloaders_vision(loader_params, labelnoise_params, image_size=(224, 224), l
         logger.log("Checkpt genloader", level=1)
         
         flowers_train = torchvision.datasets.Flowers102(
-            root=root, split='train', download=False,
+            root=root, split='train', download=True,
             transform=transforms.Compose([
                 torchvision.models.VGG16_BN_Weights.IMAGENET1K_V1.transforms(),
             ])
         )
         flowers_val   = torchvision.datasets.Flowers102(
-            root=root, split='val', download=False,
+            root=root, split='val', download=True,
             transform=transforms.Compose([
                 torchvision.models.VGG16_BN_Weights.IMAGENET1K_V1.transforms(),
             ])
         )
         flowers_test  = torchvision.datasets.Flowers102(
-            root=root, split='test', download=False,
+            root=root, split='test', download=True,
             transform=transforms.Compose([
                 transforms.RandomHorizontalFlip(p=0.5),
                 transforms.ColorJitter(brightness=0.3, contrast=0.3),
@@ -178,8 +166,6 @@ def genloaders_vision(loader_params, labelnoise_params, image_size=(224, 224), l
         train = flowers_test
         # Combine train + val into one test dataset (2040 images)
         test = ConcatDataset([flowers_train, flowers_val])
-
-        logger.log("Checkpt genloader 2", level=1)
 
     elif dataset_name == 'FGVCAircraft':
         train = torchvision.datasets.FGVCAircraft(
@@ -210,8 +196,6 @@ def genloaders_vision(loader_params, labelnoise_params, image_size=(224, 224), l
 
     dataset_data, dataset_targets = None, None
     dataset_test_data, dataset_test_targets = None, None
-
-    logger.log("Checkpt genloader 3", level=1)
     
     if dataset_name in ['FashionMNIST', 'MNIST', 'CIFAR10', 'CIFAR100']:
         dataset_data, dataset_targets = preprocess_dataset(
@@ -224,22 +208,16 @@ def genloaders_vision(loader_params, labelnoise_params, image_size=(224, 224), l
         )
     else:
         # Preprocess and save
-        # dataset_data, dataset_targets = preprocess_dataset_from_imagefolder(
-        #     train, save_path=os.path.join(dir_path, 'train_flowers102.pth')
-        # )
-        # dataset_test_data, dataset_test_targets = preprocess_dataset_from_imagefolder(
-        #     test, save_path=os.path.join(dir_path, 'test_flowers102.pth')
-        # )
+        dataset_data, dataset_targets = preprocess_dataset_from_imagefolder(
+            train, save_path=os.path.join(dir_path, 'train_flowers102.pth')
+        )
+        dataset_test_data, dataset_test_targets = preprocess_dataset_from_imagefolder(
+            test, save_path=os.path.join(dir_path, 'test_flowers102.pth')
+        )
 
         # Later, load directly
-        dataset_data, dataset_targets = load_preprocessed_dataset(os.path.join(dir_path, 'train_flowers102.pth'))
-        dataset_test_data, dataset_test_targets = load_preprocessed_dataset(os.path.join(dir_path, 'test_flowers102.pth'))
-        
-
-        # dataset_data, dataset_targets = preprocess_dataset_from_imagefolder(train)
-        # dataset_test_data, dataset_test_targets = preprocess_dataset_from_imagefolder(test)
-
-    logger.log("Checkpt genloader 4", level=1)
+        # dataset_data, dataset_targets = load_preprocessed_dataset(os.path.join(dir_path, 'train_flowers102.pth'))
+        # dataset_test_data, dataset_test_targets = load_preprocessed_dataset(os.path.join(dir_path, 'test_flowers102.pth'))
     
     ############################## Apply Label Noise ##############################
     if labelnoise_params['noise_type'] is not None and labelnoise_params['noise_level'] > 0.0:
@@ -250,9 +228,7 @@ def genloaders_vision(loader_params, labelnoise_params, image_size=(224, 224), l
             labelnoise_params['noise_level'],
             num_classes
         )
-
-    logger.log("Checkpt genloader 5", level=1)
-
+        
     ############################## Generate DataLoaders ##############################
     trainloader, testloader, IG_trainloader = genloaders(
         dataset_data,
@@ -260,10 +236,7 @@ def genloaders_vision(loader_params, labelnoise_params, image_size=(224, 224), l
         dataset_test_data,
         dataset_test_targets,
         loader_params
-    )
-
-    logger.log("Checkpt genloader 6", level=1)
-        
+    )   
     return trainloader, testloader, IG_trainloader
     
 
@@ -382,7 +355,7 @@ if __name__ == "__main__":
             train_params = {
                 'optimizer':           'Adam',
                 'init_rate':           1e-3,
-                'total_epochs':        10,
+                'total_epochs':        20,
                 'weight_decay':        1e-4,
                 'scheduler': {
                     'name':            'StepLR',
@@ -414,9 +387,9 @@ if __name__ == "__main__":
                     'step_size':       999,
                     'gamma':           0.3
                 },
-                'init_rate':           0.1,
+                'init_rate':           1e-3,
                 'total_epochs':        30,
-                'weight_decay':        0,
+                'weight_decay':        1e-4,
                 'criterion':           'CrossEntropyLoss',
                 'disp_epoch':          False,
                 'disp_loss_epoch':     True,
