@@ -320,8 +320,8 @@ class InfluenceGraphv4: # 2nd order approaches (Correlation Based)
         
         os.chdir('..')
         os.chdir('..')
-        
         return
+        
     
     def load_graph(self,folder, dataset_name,ID):
         # self.update_normalized_graph()

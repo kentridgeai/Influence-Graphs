@@ -352,14 +352,19 @@ if __name__ == "__main__":
             influence_GT_params = {
                 'type':                'batch', # batch or representative
                 'training_iterations': train_params['total_epochs'],
-                'intraclass_only':     True,
+                'class_normalize' :    False,
+                'remove_negatives' :   False,
+                'clipping' :           False,
+                'intraclass_only' :    True,
+                'negative_clipping':   False,
+                'clip_outliers':       False,
                 'dtype':               np.float32,
             }
             influence_GT_train_params = {
                 'optimizer':           'SGD',
                 'scheduler':           {'name': None}, # 'step_size': 10, 'milestones':[10,20,30],'gamma':0.8, 'max_lr': 0.01}
                 'init_rate':           0.1,
-                'total_epochs':        50,
+                'total_epochs':        30,
                 'weight_decay':        0, 
                 'criterion':           'CrossEntropyLoss',
                 'disp_epoch':          False,
