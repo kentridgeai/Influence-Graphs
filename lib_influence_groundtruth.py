@@ -50,7 +50,7 @@ def update_IG_GT(IG, main_model, batch_indices, old_trainloss, IG_trainloader, t
     labels_batch = IG_trainloader.dataset.labels[batch_indices]
     target_labels = torch.unique(labels_batch).tolist()
 
-    trainloss = np.zeros(IG.node_size)
+    trainloss = torch.zeros(IG.node_size, device=device)
 
     with torch.no_grad():
         for label in target_labels:
@@ -69,15 +69,14 @@ def update_IG_GT(IG, main_model, batch_indices, old_trainloss, IG_trainloader, t
                     outputs = model(inputs)
                     loss = criterion(outputs, labels.long())
     
-                trainloss[indices] = loss.detach().to(device)
+                trainloss[indices] = loss.detach()
 
-    # Convert trainloss for numpy operations
-    trainloss = trainloss.cpu().numpy()
     batchloss_diff = old_batchloss - trainloss[batch_indices]
-    trainloss_diff = old_trainloss - trainloss 
-    
+    trainloss_diff = old_trainloss - trainloss
+
+    # Scale ref using torch
     scale_ref      = copy.copy(trainloss_diff)
-    scale_ref      = np.sqrt(np.mean(scale_ref**2)) 
+    scale_ref      = torch.sqrt(torch.mean(scale_ref**2))
     batchloss_diff = batchloss_diff / scale_ref
     trainloss_diff = trainloss_diff / scale_ref
     
