@@ -68,7 +68,7 @@ def update_IG_GT(IG, main_model, batch_indices, old_trainloss, IG_trainloader, t
                     outputs = model(inputs)
                     loss = criterion(outputs, labels.long())
     
-                trainloss[indices.cpu()] = loss.cpu()
+                trainloss[indices] = loss.detach()
             
     batchloss_diff = old_batchloss - trainloss[batch_indices]
     trainloss_diff = old_trainloss - trainloss 
@@ -132,7 +132,7 @@ def batch_influence_GT(model_params,
                 outputs = model(inputs)
                 loss = criterion(outputs, labels.long())
 
-            trainloss[indices.cpu()] = loss.cpu()
+            trainloss[indices] = loss.detach()
             
     for epoch in range(influence_GT_params['training_iterations']):
         if logger is not None:
