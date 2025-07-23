@@ -311,6 +311,7 @@ def get_labelwise_loaders(IG_trainloader, loader_params):
         subset = Subset(IG_trainloader.dataset, indices)
         loader = torch.utils.data.DataLoader(
             subset,
+            shuffle=True,
             batch_size=loader_params['IG_batch_size'],
             num_workers=loader_params['num_workers']
         )
