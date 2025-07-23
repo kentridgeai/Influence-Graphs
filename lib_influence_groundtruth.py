@@ -85,7 +85,7 @@ def update_IG_GT(IG, main_model, batch_indices, old_trainloss, IG_trainloader, t
         batchloss_diff.cpu().numpy(),
         trainloss_diff.cpu().numpy()
     )
-    return IG, np.mean(trainloss[batch_indices.cpu()])
+    return IG, torch.mean(trainloss[batch_indices]).item()
 
 
 
