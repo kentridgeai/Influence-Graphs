@@ -359,13 +359,17 @@ if __name__ == "__main__":
                 'negative_clipping':   False,
                 'clip_outliers':       False,
                 'dtype':               np.float32,
-            }
+                }
             influence_GT_train_params = {
                 'optimizer':           'SGD',
-                'scheduler':           {'name': None}, # 'step_size': 10, 'milestones':[10,20,30],'gamma':0.8, 'max_lr': 0.01}
-                'init_rate':           0.1,
-                'total_epochs':        30,
-                'weight_decay':        0, 
+                'scheduler': {
+                    'name':            'StepLR',
+                    'step_size':       16,
+                    'gamma':           0.3
+                },
+                'init_rate':           1e-3,
+                'total_epochs':        20,
+                'weight_decay':        1e-4, 
                 'criterion':           'CrossEntropyLoss',
                 'disp_epoch':          False,
                 'disp_loss_epoch':     True,
