@@ -441,7 +441,7 @@ def update_IG(IG, main_model, batch_indices, old_trainloss, IG_trainloader, trai
     elif train_params['criterion'] == 'MSELoss':
         criterion = nn.MSELoss(reduction = 'none')
 
-    trainloss = torch.zeros(IG.node_size, device=device)
+    trainloss = np.zeros(IG.node_size)
 
     # Forward pass for full dataset
     with torch.no_grad():

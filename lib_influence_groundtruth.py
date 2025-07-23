@@ -35,7 +35,6 @@ def update_IG_GT(IG, main_model, batch_indices, old_trainloss, IG_trainloader, t
     model = copy.deepcopy(main_model)
     model = model.eval()
     
-    trainloss = torch.zeros(IG.node_size, device=device)
     batch_indices = batch_indices.cpu()
     old_batchloss = old_trainloss[batch_indices]
     
@@ -50,6 +49,8 @@ def update_IG_GT(IG, main_model, batch_indices, old_trainloss, IG_trainloader, t
 
     labels_batch = IG_trainloader.dataset.labels[batch_indices]
     target_labels = torch.unique(labels_batch).tolist()
+
+    trainloss = np.zeros(IG.node_size)
 
     with torch.no_grad():
         for label in target_labels:
