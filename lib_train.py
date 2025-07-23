@@ -457,7 +457,7 @@ def update_IG(IG, main_model, batch_indices, old_trainloss, IG_trainloader, trai
                 outputs = model(inputs)
                 loss = criterion(outputs, labels.long())
 
-            trainloss[indices] = loss.detach()
+            trainloss[indices] = loss.detach().to(device)
 
             # Free up memory proactively
             del inputs, labels, outputs, loss

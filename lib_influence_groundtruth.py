@@ -69,7 +69,7 @@ def update_IG_GT(IG, main_model, batch_indices, old_trainloss, IG_trainloader, t
                     outputs = model(inputs)
                     loss = criterion(outputs, labels.long())
     
-                trainloss[indices] = loss.detach()
+                trainloss[indices] = loss.detach().to(device)
 
     # Convert trainloss for numpy operations
     trainloss = trainloss.cpu().numpy()
