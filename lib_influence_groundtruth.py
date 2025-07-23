@@ -73,7 +73,8 @@ def update_IG_GT(IG, main_model, batch_indices, old_trainloss, IG_trainloader, t
     batchloss_diff = old_batchloss - trainloss[batch_indices]
     trainloss_diff = old_trainloss - trainloss 
     
-    scale_ref      = copy.copy(trainloss_diff).numpy()
+    scale_ref      = copy.copy(trainloss_diff)
+    scale_ref      = scale_ref.cpu().numpy()
     scale_ref      = np.sqrt(np.mean(scale_ref**2)) 
     batchloss_diff = batchloss_diff / scale_ref
     trainloss_diff = trainloss_diff / scale_ref
