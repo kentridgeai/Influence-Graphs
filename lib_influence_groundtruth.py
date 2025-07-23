@@ -123,6 +123,7 @@ def batch_influence_GT(model_params,
 
     model = get_model_from_params(model_params)
     model = model.to(device)
+    model = model.half()
     
     with torch.no_grad():
         for inputs, labels, indices in IG_trainloader:
@@ -138,27 +139,33 @@ def batch_influence_GT(model_params,
                 loss = criterion(outputs, labels.long())
 
             trainloss[indices] = loss.detach()
-            
+
+    logger.reset_timer()
     for epoch in range(influence_GT_params['training_iterations']):
         if logger is not None:
-            logger.log("Starting batch influence_GT iteration: {}...".format(epoch), level=1)
+            logger.log("Starting batch influence_GT iteration: {}...".format(epoch), level=2)
 
+        count = 0
         for inputs, labels, indices in trainloader:
             inputs, labels = inputs.to(device), labels.to(device)
+
+            if logger is not None and count == 20:
+                logger.log("Reference time of 20 trainloader thingy : {}...", level=1)
+
+            count += 1
                 
             model = get_model_from_params(model_params)
 
-            # Mixed precision scaler
-            scaler = GradScaler() if use_amp else None
             optimizer, scheduler, criterion = get_learning_config(model, influence_GT_train_params, config=config)
 
             model = model.to(device)
             model = model.train()
+            model = model.half()
             
             for mini_epoch in range(influence_GT_train_params['total_epochs']):
                 
                 if influence_GT_train_params['disp_epoch'] == True and logger is not None:
-                    logger.log("Mini batch influence_GT iteration: {}...".format(mini_epoch), level=2)
+                    logger.log("Mini epoch influence_GT iteration: {}...".format(mini_epoch), level=2)
                 
                 optimizer.zero_grad(set_to_none=True)
 
@@ -167,11 +174,9 @@ def batch_influence_GT(model_params,
                     with torch.autocast(device_type=device):
                         allouts = model(inputs)
                         loss = criterion(allouts, labels.long())
-        
-                    # Scale gradients for FP16
-                    scaler.scale(loss).backward()
-                    scaler.step(optimizer)
-                    scaler.update()
+
+                    loss.backward()
+                    optimizer.step()
                 else:
                     # Standard FP32 on CPU
                     allouts = model(inputs)

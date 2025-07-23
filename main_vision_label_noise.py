@@ -68,7 +68,7 @@ def add_label_noise(targets, noise_type, noise_level, num_classes):
 
 
 
-def genloaders_vision(loader_params, labelnoise_params, image_size=(224, 224)):
+def genloaders_vision(loader_params, labelnoise_params, image_size=(224, 224), logger=None):
 
     def preprocess_dataset(dataset, is_grayscale=False):
         
@@ -85,19 +85,41 @@ def genloaders_vision(loader_params, labelnoise_params, image_size=(224, 224)):
             data = data.permute(0, 3, 1, 2)  # [N, H, W, C] → [N, C, H, W]
 
         targets = torch.tensor(dataset.targets)
-        return data_resized, targets
+        return data, targets
 
-    def preprocess_dataset_from_imagefolder(dataset):
+    # def preprocess_dataset_from_imagefolder(dataset):
+    #     data = []
+    #     targets = []
+
+    #     for img, label in dataset:
+    #         data.append(img)
+    #         targets.append(label)
+
+    #     data = torch.stack(data)
+    #     targets = torch.tensor(targets)
+    #     return data, targets
+
+    def preprocess_dataset_from_imagefolder(dataset, save_path=None):
         data = []
         targets = []
-
+    
         for img, label in dataset:
             data.append(img)
             targets.append(label)
-
+    
         data = torch.stack(data)
         targets = torch.tensor(targets)
+    
+        if save_path is not None:
+            torch.save({'data': data, 'targets': targets}, save_path)
+            print(f"✅ Saved preprocessed dataset to {save_path}")
+    
         return data, targets
+        
+    def load_preprocessed_dataset(save_path):
+        saved = torch.load(save_path)
+        print(f"✅ Loaded preprocessed dataset from {save_path}")
+        return saved['data'], saved['targets']
 
     dataset_name = loader_params['dataset_name']
     root         = loader_params['root_folder']
@@ -128,20 +150,22 @@ def genloaders_vision(loader_params, labelnoise_params, image_size=(224, 224)):
     ############################## Additional fine grained datasets ##############################
     
     elif dataset_name == 'Flowers102':
+        logger.log("Checkpt genloader", level=1)
+        
         flowers_train = torchvision.datasets.Flowers102(
-            root=root, split='train', download=True,
+            root=root, split='train', download=False,
             transform=transforms.Compose([
                 torchvision.models.VGG16_BN_Weights.IMAGENET1K_V1.transforms(),
             ])
         )
         flowers_val   = torchvision.datasets.Flowers102(
-            root=root, split='val', download=True,
+            root=root, split='val', download=False,
             transform=transforms.Compose([
                 torchvision.models.VGG16_BN_Weights.IMAGENET1K_V1.transforms(),
             ])
         )
         flowers_test  = torchvision.datasets.Flowers102(
-            root=root, split='test', download=True,
+            root=root, split='test', download=False,
             transform=transforms.Compose([
                 transforms.RandomHorizontalFlip(p=0.5),
                 transforms.ColorJitter(brightness=0.3, contrast=0.3),
@@ -154,6 +178,8 @@ def genloaders_vision(loader_params, labelnoise_params, image_size=(224, 224)):
         train = flowers_test
         # Combine train + val into one test dataset (2040 images)
         test = ConcatDataset([flowers_train, flowers_val])
+
+        logger.log("Checkpt genloader 2", level=1)
 
     elif dataset_name == 'FGVCAircraft':
         train = torchvision.datasets.FGVCAircraft(
@@ -184,6 +210,8 @@ def genloaders_vision(loader_params, labelnoise_params, image_size=(224, 224)):
 
     dataset_data, dataset_targets = None, None
     dataset_test_data, dataset_test_targets = None, None
+
+    logger.log("Checkpt genloader 3", level=1)
     
     if dataset_name in ['FashionMNIST', 'MNIST', 'CIFAR10', 'CIFAR100']:
         dataset_data, dataset_targets = preprocess_dataset(
@@ -195,8 +223,23 @@ def genloaders_vision(loader_params, labelnoise_params, image_size=(224, 224)):
             is_grayscale=is_grayscale
         )
     else:
-        dataset_data, dataset_targets = preprocess_dataset_from_imagefolder(train)
-        dataset_test_data, dataset_test_targets = preprocess_dataset_from_imagefolder(test)
+        # Preprocess and save
+        # dataset_data, dataset_targets = preprocess_dataset_from_imagefolder(
+        #     train, save_path=os.path.join(dir_path, 'train_flowers102.pth')
+        # )
+        # dataset_test_data, dataset_test_targets = preprocess_dataset_from_imagefolder(
+        #     test, save_path=os.path.join(dir_path, 'test_flowers102.pth')
+        # )
+
+        # Later, load directly
+        dataset_data, dataset_targets = load_preprocessed_dataset(os.path.join(dir_path, 'train_flowers102.pth'))
+        dataset_test_data, dataset_test_targets = load_preprocessed_dataset(os.path.join(dir_path, 'test_flowers102.pth'))
+        
+
+        # dataset_data, dataset_targets = preprocess_dataset_from_imagefolder(train)
+        # dataset_test_data, dataset_test_targets = preprocess_dataset_from_imagefolder(test)
+
+    logger.log("Checkpt genloader 4", level=1)
     
     ############################## Apply Label Noise ##############################
     if labelnoise_params['noise_type'] is not None and labelnoise_params['noise_level'] > 0.0:
@@ -208,6 +251,8 @@ def genloaders_vision(loader_params, labelnoise_params, image_size=(224, 224)):
             num_classes
         )
 
+    logger.log("Checkpt genloader 5", level=1)
+
     ############################## Generate DataLoaders ##############################
     trainloader, testloader, IG_trainloader = genloaders(
         dataset_data,
@@ -216,6 +261,8 @@ def genloaders_vision(loader_params, labelnoise_params, image_size=(224, 224)):
         dataset_test_targets,
         loader_params
     )
+
+    logger.log("Checkpt genloader 6", level=1)
         
     return trainloader, testloader, IG_trainloader
     
@@ -281,8 +328,8 @@ if __name__ == "__main__":
     program_mode = args.program_mode # normal or GT (Ground truth)
     save_mode    = args.save_mode # store, load or none
     visualize    = args.visualize
-    noise_types  = [args.noise_type] 
-    noise_levels = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
+    noise_types  = [args.noise_type]
+    noise_levels = [0, 0.1, 0.2, 0.3, 0.4, 0.5]
     num_workers  = args.num_workers
     img_size     = args.img_size
     config       = args.config
@@ -309,8 +356,8 @@ if __name__ == "__main__":
                 'dataset_name':     dataset,
                 'conversion':       'none',
                 'root_folder':      root_folder,
-                'training_size':    'full', # 'full'
-                'batch_size':       16,   # 20-40
+                'training_size':    50000, # 'full'
+                'batch_size':       10,   # 20-40
                 'IG_batch_size':    1000, 
                 'transform':        None,
                 'add_singleton':    False,
@@ -335,7 +382,7 @@ if __name__ == "__main__":
             train_params = {
                 'optimizer':           'Adam',
                 'init_rate':           1e-3,
-                'total_epochs':        20,
+                'total_epochs':        10,
                 'weight_decay':        1e-4,
                 'scheduler': {
                     'name':            'StepLR',
@@ -359,17 +406,17 @@ if __name__ == "__main__":
                 'negative_clipping':   False,
                 'clip_outliers':       False,
                 'dtype':               np.float32,
-                }
+            }
             influence_GT_train_params = {
                 'optimizer':           'SGD',
                 'scheduler': {
                     'name':            'StepLR',
-                    'step_size':       16,
+                    'step_size':       999,
                     'gamma':           0.3
                 },
-                'init_rate':           1e-3,
-                'total_epochs':        20,
-                'weight_decay':        1e-4, 
+                'init_rate':           0.1,
+                'total_epochs':        30,
+                'weight_decay':        0,
                 'criterion':           'CrossEntropyLoss',
                 'disp_epoch':          False,
                 'disp_loss_epoch':     True,
@@ -385,7 +432,6 @@ if __name__ == "__main__":
                 'batchnorm':           True,
                 'fine_tune':           'NEW_LAYERS',
             }
-
             
             # -------------- Customize arguments based on dataset --------------
             if dataset == 'MNIST' or dataset == 'FashionMNIST':
@@ -407,7 +453,8 @@ if __name__ == "__main__":
             trainloader, testloader, IG_trainloader = genloaders_vision(
                 loader_params,
                 labelnoise_params,
-                image_size=image_size
+                image_size=image_size,
+                logger=logger
             )
 
             logger.log("Dataloaders generated, starting influence computation for program_mode {}...".format(program_mode), level=1)
