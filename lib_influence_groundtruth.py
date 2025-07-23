@@ -56,7 +56,8 @@ def update_IG_GT(IG, main_model, batch_indices, old_trainloss, IG_trainloader, t
 
             for inputs, labels, indices in loader:
                 inputs, labels = inputs.to(device), labels.to(device)
-                with autocast():
+                
+                with torch.autocast(device_type=device):
                     outputs = model(inputs)
                     loss = criterion(outputs, labels.long())
                 trainloss[indices.cpu()] = loss.cpu()
@@ -113,7 +114,7 @@ def batch_influence_GT(model_params,
     with torch.no_grad():
         for inputs, labels, indices in IG_trainloader:
             inputs, labels = inputs.to(device), labels.to(device)
-            with autocast():
+            with torch.autocast(device_type=device):
                 allouts = model(inputs)
                 loss = criterion(allouts, labels.long())
             trainloss[indices.cpu()] = loss.cpu() 
@@ -140,7 +141,7 @@ def batch_influence_GT(model_params,
                     logger.log("Mini batch influence_GT iteration: {}...".format(mini_epoch), level=2)
                 
                 optimizer.zero_grad()
-                with autocast():
+                with torch.autocast(device_type=device):
                     allouts = model(inputs)
                     loss = criterion(allouts, labels.long()) 
                 loss.backward()
