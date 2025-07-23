@@ -27,7 +27,7 @@ os.chdir(dir_path)
     
 
 
-def update_IG_GT(IG, main_model, batch_indices, old_trainloss, IG_trainloader, train_params, labelwise_loaders, logger=None):
+def update_IG_GT(IG, main_model, batch_indices, old_trainloss, IG_trainloader, train_params, loader_params, logger=None):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     use_amp = device == 'cuda'
     
@@ -48,28 +48,38 @@ def update_IG_GT(IG, main_model, batch_indices, old_trainloss, IG_trainloader, t
         criterion = nn.MSELoss(reduction = 'none')
 
     labels_batch = IG_trainloader.dataset.labels[batch_indices]
-    target_labels = torch.unique(labels_batch).tolist()
+    target_labels = torch.unique(labels_batch)
+    all_labels = IG_trainloader.dataset.labels  # assumed to be list or tensor
+
+    # Find matching indices where label ∈ target_labels
+    mask             = torch.isin(all_labels, target_labels)
+    matching_indices = torch.nonzero(mask).squeeze().tolist()
+    
+    # Build filtered loader
+    subset = Subset(IG_trainloader.dataset, matching_indices)
+    filtered_loader = DataLoader(
+        subset,
+        batch_size=loader_params['IG_batch_size'],
+        pin_memory=True
+    )
 
     trainloss = torch.zeros(IG.node_size, device=device)
 
+    # Compute losses
     with torch.no_grad():
-        for label in target_labels:
-            loader = labelwise_loaders.get(label)
-            if loader is None: continue  # No data points with this label
+        for inputs, labels, indices in filtered_loader:
+            inputs, labels = inputs.to(device), labels.to(device)
 
-            for inputs, labels, indices in loader:
-                inputs, labels = inputs.to(device), labels.to(device)
-                
-                # Mixed precision if on GPU
-                if use_amp:
-                    with torch.autocast(device_type=device):
-                        outputs = model(inputs)
-                        loss = criterion(outputs, labels.long())
-                else:
+            # Mixed precision if on GPU
+            if use_amp:
+                with torch.autocast(device_type=device):
                     outputs = model(inputs)
                     loss = criterion(outputs, labels.long())
-    
-                trainloss[indices] = loss.detach()
+            else:
+                outputs = model(inputs)
+                loss = criterion(outputs, labels.long())
+                
+            trainloss[indices] = loss.detach()
 
     batchloss_diff = old_batchloss - trainloss[batch_indices]
     trainloss_diff = old_trainloss - trainloss
@@ -108,7 +118,6 @@ def batch_influence_GT(model_params,
         trainloader.batch_size,
         influence_GT_params
     )
-    labelwise_loaders = get_labelwise_loaders(IG_trainloader, loader_params)
         
     if influence_GT_train_params['criterion'] == 'BCEWithLogitsLoss':
         criterion = nn.BCEWithLogitsLoss()
@@ -193,7 +202,7 @@ def batch_influence_GT(model_params,
                 trainloss,
                 IG_trainloader,
                 influence_GT_train_params,
-                labelwise_loaders,
+                loader_params,
                 logger=logger
             )
                 

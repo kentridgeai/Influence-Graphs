@@ -478,7 +478,6 @@ if __name__ == "__main__":
                     config=config,
                     logger=logger
                 )
-                IG_GT.store_graph('IG-DB', loader_params, influence_GT_params, influence_GT_train_params)
                 graphmat = IG_GT.normgraph_mat
                 
                 mean_in_degree = np.mean(graphmat.max(axis=0))
