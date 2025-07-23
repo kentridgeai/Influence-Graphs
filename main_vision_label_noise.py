@@ -138,8 +138,6 @@ def genloaders_vision(loader_params, labelnoise_params, image_size=(224, 224), l
     ############################## Additional fine grained datasets ##############################
     
     elif dataset_name == 'Flowers102':
-        logger.log("Checkpt genloader", level=1)
-        
         flowers_train = torchvision.datasets.Flowers102(
             root=root, split='train', download=True,
             transform=transforms.Compose([
@@ -208,16 +206,16 @@ def genloaders_vision(loader_params, labelnoise_params, image_size=(224, 224), l
         )
     else:
         # Preprocess and save
-        dataset_data, dataset_targets = preprocess_dataset_from_imagefolder(
-            train, save_path=os.path.join(dir_path, 'train_flowers102.pth')
-        )
-        dataset_test_data, dataset_test_targets = preprocess_dataset_from_imagefolder(
-            test, save_path=os.path.join(dir_path, 'test_flowers102.pth')
-        )
+        # dataset_data, dataset_targets = preprocess_dataset_from_imagefolder(
+        #     train, save_path=os.path.join(dir_path, 'train_flowers102.pth')
+        # )
+        # dataset_test_data, dataset_test_targets = preprocess_dataset_from_imagefolder(
+        #     test, save_path=os.path.join(dir_path, 'test_flowers102.pth')
+        # )
 
         # Later, load directly
-        # dataset_data, dataset_targets = load_preprocessed_dataset(os.path.join(dir_path, 'train_flowers102.pth'))
-        # dataset_test_data, dataset_test_targets = load_preprocessed_dataset(os.path.join(dir_path, 'test_flowers102.pth'))
+        dataset_data, dataset_targets = load_preprocessed_dataset(os.path.join(dir_path, 'train_flowers102.pth'))
+        dataset_test_data, dataset_test_targets = load_preprocessed_dataset(os.path.join(dir_path, 'test_flowers102.pth'))
     
     ############################## Apply Label Noise ##############################
     if labelnoise_params['noise_type'] is not None and labelnoise_params['noise_level'] > 0.0:
@@ -330,7 +328,7 @@ if __name__ == "__main__":
                 'conversion':       'none',
                 'root_folder':      root_folder,
                 'training_size':    50000, # 'full'
-                'batch_size':       10,   # 20-40
+                'batch_size':       16,   # 20-40
                 'IG_batch_size':    1000, 
                 'transform':        None,
                 'add_singleton':    False,
@@ -384,11 +382,11 @@ if __name__ == "__main__":
                 'optimizer':           'SGD',
                 'scheduler': {
                     'name':            'StepLR',
-                    'step_size':       999,
+                    'step_size':       16,
                     'gamma':           0.3
                 },
                 'init_rate':           1e-3,
-                'total_epochs':        30,
+                'total_epochs':        20,
                 'weight_decay':        1e-4,
                 'criterion':           'CrossEntropyLoss',
                 'disp_epoch':          False,
