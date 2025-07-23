@@ -345,7 +345,7 @@ def get_learning_config(model, train_params, config=None):
         # Every 2 steps reduce the LR to 70% of the previous value.
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=2, gamma=0.7)
             
-    elif config == 'pretrained_Resnet50':
+    elif config == 'pretrained_resnet50':
         # For the resnet class of models, we decay the LR exponentially and reduce
         # it to a third of the previous value at each step.
         layers = ['conv1', 'bn1', 'layer1', 'layer2', 'layer3', 'layer4', 'fc']
