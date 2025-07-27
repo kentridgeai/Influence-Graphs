@@ -63,7 +63,7 @@ def update_IG_GT(IG, main_model, batch_indices, old_trainloss, IG_trainloader, t
         pin_memory=True
     )
 
-    trainloss = torch.zeros(IG.node_size, device=device)
+    trainloss = np.zeros(IG.node_size)
 
     # Compute losses
     with torch.no_grad():
@@ -79,23 +79,22 @@ def update_IG_GT(IG, main_model, batch_indices, old_trainloss, IG_trainloader, t
                 outputs = model(inputs)
                 loss = criterion(outputs, labels.long())
                 
-            trainloss[indices] = loss.detach()
+            trainloss[indices.cpu()] = loss.cpu()
 
     batchloss_diff = old_batchloss - trainloss[batch_indices]
     trainloss_diff = old_trainloss - trainloss
 
-    # Scale ref using torch
-    scale_ref      = copy.copy(trainloss_diff)
-    scale_ref      = torch.sqrt(torch.mean(scale_ref**2))
+    scale_ref      = copy.copy(trainloss_diff[matching_indices])
+    scale_ref      = np.sqrt(np.mean(scale_ref**2))
     batchloss_diff = batchloss_diff / scale_ref
     trainloss_diff = trainloss_diff / scale_ref
 
     IG.update_influence_graph(
         batch_indices,
-        batchloss_diff.cpu().numpy(),
-        trainloss_diff.cpu().numpy()
+        batchloss_diff,
+        trainloss_diff
     )
-    return IG, torch.mean(trainloss[batch_indices]).item()
+    return IG, np.mean(trainloss[batch_indices.cpu()])
 
 
 
@@ -112,7 +111,7 @@ def batch_influence_GT(model_params,
     
     node_size = trainloader.dataset.inputs.shape[0]
     
-    IG_GT = InfluenceGraphv4(
+    IG_GT = InfluenceGraphv5(
         node_size,
         trainloader.dataset.labels.squeeze().cpu().numpy(),
         trainloader.batch_size,
@@ -128,11 +127,13 @@ def batch_influence_GT(model_params,
     elif influence_GT_train_params['criterion'] == 'MSELoss':
         criterion = nn.MSELoss()
 
-    trainloss = torch.zeros(IG_GT.node_size, device=device)
+    trainloss = np.zeros(node_size)
 
     model = get_model_from_params(model_params)
     model = model.to(device)
     model = model.half()
+
+    state_dict = model.state_dict()
     
     with torch.no_grad():
         for inputs, labels, indices in IG_trainloader:
@@ -147,23 +148,27 @@ def batch_influence_GT(model_params,
                 outputs = model(inputs)
                 loss = criterion(outputs, labels.long())
 
-            trainloss[indices] = loss.detach()
+            trainloss[indices.cpu()] = loss.cpu()
 
     logger.reset_timer()
     for epoch in range(influence_GT_params['training_iterations']):
+        gc.collect()
+        # logger.reset_timer()
+        
         if logger is not None:
-            logger.log("Starting batch influence_GT iteration: {}...".format(epoch), level=2)
+            logger.log("Starting batch influence_GT iteration: {}...".format(epoch), level=1)
 
         count = 0
         for inputs, labels, indices in trainloader:
             inputs, labels = inputs.to(device), labels.to(device)
 
-            if logger is not None and count == 20:
-                logger.log("Reference time of 20 trainloader thingy : {}...", level=1)
+            if logger is not None and count % 20 == 0:
+                logger.log("Reference time of 20 trainloader thingy : {}...", level=2)
 
             count += 1
                 
-            model = get_model_from_params(model_params)
+            # model = get_model_from_params(model_params)
+            model.load_state_dict(state_dict)
 
             optimizer, scheduler, criterion = get_learning_config(model, influence_GT_train_params, config=config)
 
@@ -183,9 +188,10 @@ def batch_influence_GT(model_params,
                     with torch.autocast(device_type=device):
                         allouts = model(inputs)
                         loss = criterion(allouts, labels.long())
-
+    
                     loss.backward()
                     optimizer.step()
+                
                 else:
                     # Standard FP32 on CPU
                     allouts = model(inputs)
@@ -207,7 +213,7 @@ def batch_influence_GT(model_params,
             )
                 
             if influence_GT_train_params['disp_loss_epoch'] == True and logger is not None:
-                logger.log("Training Loss: {}...".format(mean_trainloss), level=1)
+                logger.log("Training Loss: {}...".format(mean_trainloss), level=2)
             
     IG_GT.update_normalized_graph()
     

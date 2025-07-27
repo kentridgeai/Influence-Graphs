@@ -135,6 +135,14 @@ def genloaders_vision(loader_params, labelnoise_params, image_size=(224, 224), l
         train = torchvision.datasets.MNIST(root=root, train=True, download=True, transform=data_transform)
         test = torchvision.datasets.MNIST(root=root, train=False, download=True, transform=data_transform)
 
+    elif dataset_name == 'CIFAR10':
+        data_transform = transforms.Compose([
+            transforms.Resize(image_size),
+            transforms.ToTensor(),
+        ])
+        train = torchvision.datasets.CIFAR10(root=root, train=True, download=True, transform=data_transform)
+        test = torchvision.datasets.CIFAR10(root=root, train=False, download=True, transform=data_transform)
+
     ############################## Additional fine grained datasets ##############################
     
     elif dataset_name == 'Flowers102':
@@ -216,6 +224,10 @@ def genloaders_vision(loader_params, labelnoise_params, image_size=(224, 224), l
         # Later, load directly
         dataset_data, dataset_targets = load_preprocessed_dataset(os.path.join(dir_path, 'train_flowers102.pth'))
         dataset_test_data, dataset_test_targets = load_preprocessed_dataset(os.path.join(dir_path, 'test_flowers102.pth'))
+        
+
+        # dataset_data, dataset_targets = preprocess_dataset_from_imagefolder(train)
+        # dataset_test_data, dataset_test_targets = preprocess_dataset_from_imagefolder(test)
     
     ############################## Apply Label Noise ##############################
     if labelnoise_params['noise_type'] is not None and labelnoise_params['noise_level'] > 0.0:
@@ -226,7 +238,7 @@ def genloaders_vision(loader_params, labelnoise_params, image_size=(224, 224), l
             labelnoise_params['noise_level'],
             num_classes
         )
-        
+
     ############################## Generate DataLoaders ##############################
     trainloader, testloader, IG_trainloader = genloaders(
         dataset_data,
@@ -234,7 +246,8 @@ def genloaders_vision(loader_params, labelnoise_params, image_size=(224, 224), l
         dataset_test_data,
         dataset_test_targets,
         loader_params
-    )   
+    )
+        
     return trainloader, testloader, IG_trainloader
     
 
@@ -275,7 +288,7 @@ if __name__ == "__main__":
     parser.add_argument('--noise_type', type=str, default='symmetric', choices=['symmetric', 'asymmetric', 'none'], help='Type of label noise')
     parser.add_argument('--program_mode', type=str, default='normal', choices=['normal', 'GT'], help='Run mode')
     parser.add_argument('--save_mode', type=str, default='load', choices=['load', 'store', 'none'], help='Save or load influence graph')
-    parser.add_argument('--visualize', action='store_true', help='Enable visualization of influence pairs')
+    parser.add_argument('--visualize', type=bool, default=True, help='Enable visualization of influence pairs')
     parser.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu', help='Device to use')
     parser.add_argument('--num_workers', type=int, default=0, help='Number of workers for loaders')
     parser.add_argument('--img_size', type=int, default=32, help='Size to resize input image to')
@@ -327,8 +340,8 @@ if __name__ == "__main__":
                 'dataset_name':     dataset,
                 'conversion':       'none',
                 'root_folder':      root_folder,
-                'training_size':    50000, # 'full'
-                'batch_size':       16,   # 20-40
+                'training_size':    1000, # 'full'
+                'batch_size':       10,   # 20-40
                 'IG_batch_size':    1000, 
                 'transform':        None,
                 'add_singleton':    False,
@@ -348,12 +361,12 @@ if __name__ == "__main__":
                 'mode':               'mean', # For InfluenceGraphv3
                 'gradient_lr':        0.1, # For InfluenceGraphv3
                 'dtype':              np.float32,
-                'graph_type':         InfluenceGraphv4,
+                'graph_type':         InfluenceGraphv5,
             }
             train_params = {
                 'optimizer':           'Adam',
                 'init_rate':           1e-3,
-                'total_epochs':        20,
+                'total_epochs':        10,
                 'weight_decay':        1e-4,
                 'scheduler': {
                     'name':            'StepLR',
@@ -364,7 +377,7 @@ if __name__ == "__main__":
                 'disp_epoch':          True,
                 'disp_loss_epoch':     False,
                 'disp_time_per_epoch': True, 
-                'disp_loss_final':     True, 
+                'disp_loss_final':     True,
                 'disp_accuracy_final': True
             }
             influence_GT_params = {
@@ -382,12 +395,12 @@ if __name__ == "__main__":
                 'optimizer':           'SGD',
                 'scheduler': {
                     'name':            'StepLR',
-                    'step_size':       16,
+                    'step_size':       999,
                     'gamma':           0.3
                 },
-                'init_rate':           1e-3,
-                'total_epochs':        20,
-                'weight_decay':        1e-4,
+                'init_rate':           0.05,
+                'total_epochs':        40,
+                'weight_decay':        0,
                 'criterion':           'CrossEntropyLoss',
                 'disp_epoch':          False,
                 'disp_loss_epoch':     True,
@@ -479,11 +492,17 @@ if __name__ == "__main__":
         
             #
             if visualize:
-                vis_influencepairs(graphmat, trainloader.dataset.inputs, max_percentile = 1, num_pairs=25)
-                vis_influencepairs(graphmat, trainloader.dataset.inputs, min_percentile = 99, num_pairs=25)
+                save_path = os.path.join(
+                    dir_path,
+                    'Figures',
+                    loader_params['dataset_name'],
+                    labelnoise_params['noise_type'] + str(labelnoise_params['noise_level'])
+                )
+                vis_influencepairs(graphmat, trainloader.dataset.inputs, save_path, max_percentile = 1, num_pairs=25)
+                vis_influencepairs(graphmat, trainloader.dataset.inputs, save_path, min_percentile = 99, num_pairs=25)
     
-                vis_influencenodes(graphmat, trainloader.dataset.inputs, max_percentile = 3, num_nodes = 25)
-                vis_influencenodes(graphmat, trainloader.dataset.inputs, min_percentile = 97, num_nodes = 25) 
+                vis_influencenodes(graphmat, trainloader.dataset.inputs, save_path, max_percentile = 3, num_nodes = 25)
+                vis_influencenodes(graphmat, trainloader.dataset.inputs, save_path, min_percentile = 97, num_nodes = 25) 
             #
 
             # -------------- Clean up after each noise_level --------------

@@ -5,16 +5,21 @@ Created on Wed Jan 15 14:12:02 2025
 @author: User
 """
 
+import os
 import networkx as nx
 import matplotlib.pyplot as plt 
-import numpy as np 
-from networkx.classes.function import *
+import numpy as np
 import matplotlib.patches as patches
 import matplotlib.gridspec as gridspec
 
+from networkx.classes.function import *
 
 
-def vis_influencepairs(G, images, min_percentile=0, max_percentile=100, num_pairs=10):
+dir_path = os.path.dirname(os.path.realpath(__file__))
+os.chdir(dir_path)
+
+
+def vis_influencepairs(G, images, save_path, min_percentile=0, max_percentile=100, num_pairs=10):
     
     W = G.data
     x,y = G.nonzero()
@@ -52,8 +57,14 @@ def vis_influencepairs(G, images, min_percentile=0, max_percentile=100, num_pair
         # Remove axis for a cleaner look
         ax1.axis('off')
         ax2.axis('off')
+
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+
+    filename = f"Vis_pairs_min{min_percentile}_max{max_percentile}.png"
+    plt.savefig(os.path.join(save_path, filename), dpi=300, bbox_inches='tight')
     
-    plt.show()
+    # plt.show()
 
     # for i in range(num_pairs):
     #     f, axarr = plt.subplots(1,2)
@@ -63,7 +74,7 @@ def vis_influencepairs(G, images, min_percentile=0, max_percentile=100, num_pair
         
     
 
-def vis_influencenodes(G,images, min_percentile = 0, max_percentile = 100, num_nodes = 10):
+def vis_influencenodes(G, images, save_path, min_percentile=0, max_percentile=100, num_nodes=10):
     
     W = G.sum(axis=1)
     sorted_indices = np.argsort(W.flatten())[0]
@@ -100,8 +111,14 @@ def vis_influencenodes(G,images, min_percentile = 0, max_percentile = 100, num_n
         color='green'
     )
     f.patches.append(green_bar)
+
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+
+    filename = f"Vis_nodes_min{min_percentile}_max{max_percentile}.png"
+    plt.savefig(os.path.join(save_path, filename), dpi=300, bbox_inches='tight')
     
-    plt.show()
+    # plt.show()
     
     # for i in range(num_nodes):
     #     f, ax = plt.subplots()
