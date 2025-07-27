@@ -133,7 +133,7 @@ def batch_influence_GT(model_params,
     model = model.to(device)
     model = model.half()
 
-    state_dict = model.state_dict()
+    state_dict = copy.deepcopy(model.state_dict())
     
     with torch.no_grad():
         for inputs, labels, indices in IG_trainloader:
