@@ -83,7 +83,8 @@ def vis_influencenodes(G, images, save_path, min_percentile=0, max_percentile=10
     min_weight_id = int(min_percentile*np.prod(W.shape)/100.0)
     max_weight_id = int(max_percentile*np.prod(W.shape)/100.0) 
 
-    indices = sorted_indices[0,min_weight_id:max_weight_id]
+    indices = sorted_indices[0, min_weight_id:max_weight_id]
+    indices = np.asarray(indices)
     
     if max_percentile == 100:
         indices = indices[::-1]

@@ -215,15 +215,18 @@ def genloaders_vision(loader_params, labelnoise_params, image_size=(224, 224), l
     else:
         # Preprocess and save
         # dataset_data, dataset_targets = preprocess_dataset_from_imagefolder(
-        #     train, save_path=os.path.join(dir_path, 'train_flowers102.pth')
+        #     train, save_path=os.path.join(dir_path, 'train_fgvcaircraft.pth')
         # )
         # dataset_test_data, dataset_test_targets = preprocess_dataset_from_imagefolder(
-        #     test, save_path=os.path.join(dir_path, 'test_flowers102.pth')
+        #     test, save_path=os.path.join(dir_path, 'test_fgvcaircraft.pth')
         # )
 
         # Later, load directly
-        dataset_data, dataset_targets = load_preprocessed_dataset(os.path.join(dir_path, 'train_flowers102.pth'))
-        dataset_test_data, dataset_test_targets = load_preprocessed_dataset(os.path.join(dir_path, 'test_flowers102.pth'))
+        # dataset_data, dataset_targets = load_preprocessed_dataset(os.path.join(dir_path, 'train_flowers102.pth'))
+        # dataset_test_data, dataset_test_targets = load_preprocessed_dataset(os.path.join(dir_path, 'test_flowers102.pth'))
+
+        dataset_data, dataset_targets = load_preprocessed_dataset(os.path.join(dir_path, 'train_fgvcaircraft.pth'))
+        dataset_test_data, dataset_test_targets = load_preprocessed_dataset(os.path.join(dir_path, 'test_fgvcaircraft.pth'))
         
 
         # dataset_data, dataset_targets = preprocess_dataset_from_imagefolder(train)
@@ -340,7 +343,7 @@ if __name__ == "__main__":
                 'dataset_name':     dataset,
                 'conversion':       'none',
                 'root_folder':      root_folder,
-                'training_size':    1000, # 'full'
+                'training_size':    'full', # 'full'
                 'batch_size':       10,   # 20-40
                 'IG_batch_size':    1000, 
                 'transform':        None,
@@ -408,7 +411,7 @@ if __name__ == "__main__":
                 'disp_total_time':     True,
             }
             model_params = {
-                'type':                CNN,
+                'type':                ResNet if 'ResNet' in model_name else CNN,
                 'name':                model_name,
                 'in_channels':         1,
                 'num_classes':         10,
@@ -429,6 +432,10 @@ if __name__ == "__main__":
             elif dataset == 'Flowers102':
                 model_params['in_channels'] = 3
                 model_params['num_classes'] = 102
+
+            elif dataset == 'FGVCAircraft':
+                model_params['in_channels'] = 3
+                model_params['num_classes'] = 100
 
 
             model = get_model_from_params(model_params)
