@@ -273,9 +273,7 @@ if __name__ == "__main__":
     logger.log("Main process started.", level=1)
 
     # -------------- Unpack parser arguments --------------
-    root_folder  = args.root_folder
     num_workers  = args.num_workers
-    img_size     = args.img_size
 
     # -------------- Device Setup --------------
     DEVICE = torch.device(args.device)
