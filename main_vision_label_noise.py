@@ -68,6 +68,22 @@ def add_label_noise(targets, noise_type, noise_level, num_classes):
 
 
 
+def convert_to_serializable(d):
+    def convert_value(v):
+        if isinstance(v, (np.float32, np.float64)):
+            return float(v)
+        elif isinstance(v, (np.int32, np.int64)):
+            return int(v)
+        elif isinstance(v, np.ndarray):
+            return v.tolist()
+        elif isinstance(v, dict):
+            return convert_to_serializable(v)
+        else:
+            return v
+    return {k: convert_value(v) for k, v in d.items()}
+
+
+
 def genloaders_vision(loader_params, labelnoise_params, image_size=(224, 224), logger=None):
 
     def preprocess_dataset(dataset, is_grayscale=False):
@@ -257,11 +273,12 @@ def genloaders_vision(loader_params, labelnoise_params, image_size=(224, 224), l
         
     return trainloader, testloader, IG_trainloader
     
-
+    
 
 def save_params_and_matrix(filename, params_dict, sparse_matrix):
+    serializable_dict = convert_to_serializable(params_dict)
     with open(filename + '.json', 'w') as f:
-        json.dump(params_dict, f)
+        json.dump(serializable_dict, f)
     sparse.save_npz(filename + '.npz', sparse_matrix)
 
 
@@ -347,9 +364,9 @@ if __name__ == "__main__":
                 'dataset_name':     dataset,
                 'conversion':       'none',
                 'root_folder':      root_folder,
-                'training_size':    'full', # 'full'
+                'training_size':    1000, # 'full'
                 'batch_size':       10,   # 20-40
-                'IG_batch_size':    800, 
+                'IG_batch_size':    1000, 
                 'transform':        None,
                 'add_singleton':    False,
                 'convert_to_torch': False,
@@ -373,7 +390,7 @@ if __name__ == "__main__":
             train_params = {
                 'optimizer':           'Adam',
                 'init_rate':           1e-3,
-                'total_epochs':        0,
+                'total_epochs':        10,
                 'weight_decay':        1e-4,
                 'scheduler': {
                     'name':            'StepLR',

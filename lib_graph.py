@@ -62,7 +62,6 @@ class InfluenceGraphv5: # 2nd order approaches (Correlation Based)
 
         # Loop over each block
         for b in range(self.n_blocks):
-            print(b)
             C = self.count_data[b].astype(float)
             if np.all(C == 0):
                 continue  # Skip empty blocks
@@ -94,8 +93,6 @@ class InfluenceGraphv5: # 2nd order approaches (Correlation Based)
         # Recover global coordinates
         row = self.inverse_lookup[block_id, local_x]
         col = self.inverse_lookup[block_id, local_y]
-        print(row.min(),row.max())
-        print(col.min(),col.max())
 
         # Construct sparse matrix
         N = len(self._block_id)
