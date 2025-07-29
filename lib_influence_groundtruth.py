@@ -80,7 +80,6 @@ def update_IG_GT(IG, main_model, batch_indices, old_trainloss, IG_trainloader, t
                 loss = criterion(outputs, labels.long())
                 
             trainloss[indices.cpu()] = loss.cpu()
-    print('stuck')
 
     batchloss_diff = old_batchloss - trainloss[batch_indices]
     trainloss_diff = old_trainloss - trainloss
