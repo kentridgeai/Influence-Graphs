@@ -259,6 +259,7 @@ if __name__ == "__main__":
     
     ############################## Argument Parser ##############################
     parser = argparse.ArgumentParser(description="Run influence estimation with label noise")
+    parser.add_argument('--dataset', type=str, default='MNIST', help='Dataset name')
     parser.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu', help='Device to use')
     parser.add_argument('--num_workers', type=int, default=0, help='Number of workers for loaders')
     parser.add_argument('--log_verbosity', type=int, default=1, help='log message verbosity (0=critical, 1=info, 2=debug)')
@@ -273,6 +274,7 @@ if __name__ == "__main__":
     logger.log("Main process started.", level=1)
 
     # -------------- Unpack parser arguments --------------
+    dataset      = args.dataset
     num_workers  = args.num_workers
 
     # -------------- Device Setup --------------
@@ -285,8 +287,6 @@ if __name__ == "__main__":
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     prerequisites()
-
-    logger.log("Running experiment using dataset:{}, with model_name: {}...".format(dataset, model_name), level=1)
 
     influence_params = {
         'loss_scaling_span':  'full', # 'batch' or 'full'
@@ -305,7 +305,7 @@ if __name__ == "__main__":
     }
     influence_GT_params = {
         'type':                'batch', # batch or representative
-        'training_iterations': train_params['total_epochs'],
+        'training_iterations': 10,
         'class_normalize' :    False,
         'remove_negatives' :   False,
         'clipping' :           False,
@@ -346,8 +346,13 @@ if __name__ == "__main__":
     root         = loader_params['root_folder']
     model_name   = model_params['name']
 
+    loader_params['training_size'] = 5000
+    loader_params['batch_size']    = 10
+    train_params['total_epochs']   = 10
 
     model = get_model_from_params(model_params)
+
+    logger.log("Running experiment using dataset:{}, with model_name: {}...".format(dataset, model_name), level=1)
     
     image_size = (img_size, img_size)
     trainloader, testloader, IG_trainloader = genloaders_vision(

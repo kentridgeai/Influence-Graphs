@@ -305,7 +305,7 @@ if __name__ == "__main__":
         'root_folder':         root_folder,
         'training_size':       'full', # 'full'
         'batch_size':          400,
-        'IG_batch_size':       1000, 
+        'IG_batch_size':       500, 
         'transform':           None,
         'add_singleton':       False,
         'convert_to_torch':    False,
@@ -314,8 +314,8 @@ if __name__ == "__main__":
     train_params = {
         'optimizer':           'Adam',
         'scheduler':           {'name': None}, # 'step_size': 10, 'milestones':[10,20,30],'gamma':0.8, 'max_lr': 0.01}
-        'init_rate':           0.0005,
-        'total_epochs':        150,
+        'init_rate':           0.0002,
+        'total_epochs':        40,
         'weight_decay':        0, 
         'criterion':           'CrossEntropyLoss',
         'disp_epoch':          False,
@@ -332,7 +332,7 @@ if __name__ == "__main__":
         'img_size':            img_size,
         'batchnorm':           True,
         'fine_tune':           'NEW_LAYERS',
-        'snapshot_k':          15,
+        'snapshot_k':          4,
     }
 
     # -------------- Customize arguments based on dataset --------------
