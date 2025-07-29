@@ -345,6 +345,7 @@ if __name__ == "__main__":
     dataset_name = loader_params['dataset_name']
     root         = loader_params['root_folder']
     model_name   = model_params['name']
+    img_size     = model_params['img_size']
 
     loader_params['training_size'] = 5000
     loader_params['batch_size']    = 10
