@@ -48,27 +48,7 @@ os.chdir(dir_path)
 
 
 
-def add_label_noise(targets, noise_type, noise_level, num_classes):
-    np_targets = targets.cpu().numpy()
-    num_noisy = int(noise_level * len(np_targets))
-    noisy_indices = np.random.choice(len(np_targets), num_noisy, replace=False)
-
-    if noise_type == 'symmetric':
-        # Symmetric noise: randomly assign any class
-        new_labels = np.random.choice(num_classes, num_noisy)
-        
-    elif noise_type == 'asymmetric':
-        # Asymmetric noise: shift labels to the next class
-        new_labels = np_targets[noisy_indices].copy()
-        for i in range(num_noisy):
-            new_labels[i] = (np_targets[noisy_indices[i]] + 1) % num_classes
-
-    np_targets[noisy_indices] = new_labels
-    return torch.from_numpy(np_targets).to(targets.device)
-
-
-
-def genloaders_vision(loader_params, labelnoise_params, image_size=(224, 224), logger=None):
+def genloaders_vision(loader_params, image_size=(224, 224), logger=None):
 
     def preprocess_dataset(dataset, is_grayscale=False):
         
@@ -235,16 +215,6 @@ def genloaders_vision(loader_params, labelnoise_params, image_size=(224, 224), l
             dataset_test_data, dataset_test_targets = preprocess_dataset_from_imagefolder(
                 test, save_path=save_test_path
             )
-    
-    ############################## Apply Label Noise ##############################
-    if labelnoise_params['noise_type'] is not None and labelnoise_params['noise_level'] > 0.0:
-        num_classes = len(torch.unique(dataset_targets))
-        dataset_targets = add_label_noise(
-            dataset_targets,
-            labelnoise_params['noise_type'], 
-            labelnoise_params['noise_level'],
-            num_classes
-        )
 
     ############################## Generate DataLoaders ##############################
     trainloader, testloader, IG_trainloader = genloaders(
@@ -292,10 +262,6 @@ if __name__ == "__main__":
     parser.add_argument('--dataset', type=str, default='MNIST', help='Dataset name')
     parser.add_argument('--model_name', type=str, default='ShallowMNIST', help='Model for experiment')
     parser.add_argument('--root_folder', type=str, default='../data', help='Root folder for data')
-    parser.add_argument('--noise_type', type=str, default='symmetric', choices=['symmetric', 'asymmetric', 'none'], help='Type of label noise')
-    parser.add_argument('--program_mode', type=str, default='normal', choices=['normal', 'GT'], help='Run mode')
-    parser.add_argument('--save_mode', type=str, default='load', choices=['load', 'store', 'none'], help='Save or load influence graph')
-    parser.add_argument('--visualize', type=bool, default=True, help='Enable visualization of influence pairs')
     parser.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu', help='Device to use')
     parser.add_argument('--num_workers', type=int, default=0, help='Number of workers for loaders')
     parser.add_argument('--img_size', type=int, default=32, help='Size to resize input image to')
@@ -316,11 +282,6 @@ if __name__ == "__main__":
     dataset      = args.dataset
     model_name   = args.model_name
     root_folder  = args.root_folder
-    program_mode = args.program_mode # normal or GT (Ground truth)
-    save_mode    = args.save_mode # store, load or none
-    visualize    = args.visualize
-    noise_types  = [args.noise_type]
-    noise_levels = [0, 0.1, 0.2, 0.3, 0.4, 0.5]
     num_workers  = args.num_workers
     img_size     = args.img_size
     config       = args.config
@@ -332,200 +293,144 @@ if __name__ == "__main__":
         DEVICE = torch.device('cpu')
     logger.log("Using device: {}".format(DEVICE), level=1)
 
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
     prerequisites()
 
-    for noise_type in noise_types:
-        for noise_level in noise_levels:
-            logger.log("Running experiment using noise_type:{}, with noise_level: {}...".format(noise_type, noise_level), level=1)
-            
-            labelnoise_params = {
-                'noise_type':  noise_type,
-                'noise_level': noise_level
-            }
-            
-            loader_params = {
-                'dataset_name':     dataset,
-                'conversion':       'none',
-                'root_folder':      root_folder,
-                'training_size':    'full', # 'full'
-                'batch_size':       10,   # 20-40
-                'IG_batch_size':    1000, 
-                'transform':        None,
-                'add_singleton':    False,
-                'convert_to_torch': False,
-                'num_workers':      num_workers,
-            }
-            influence_params = {
-                'loss_scaling_span':  'full', # 'batch' or 'full'
-                'loss_scaling_type':  'root_mean_squared', # 'mean' or 'mean_absolute' or None
-                'set_zero_mean':      False,# 'full' or 'separate'
-                'class_normalize' :   False,
-                'remove_negatives' :  False,
-                'clipping' :          False,
-                'intraclass_only' :   True,
-                'negative_clipping':  False,
-                'clip_outliers':      False,
-                'mode':               'mean', # For InfluenceGraphv3
-                'gradient_lr':        0.1, # For InfluenceGraphv3
-                'dtype':              np.float32,
-                'graph_type':         InfluenceGraphv5,
-            }
-            train_params = {
-                'optimizer':           'Adam',
-                'init_rate':           1e-3,
-                'total_epochs':        10,
-                'weight_decay':        1e-4,
-                'scheduler': {
-                    'name':            'StepLR',
-                    'step_size':       16,
-                    'gamma':           0.3
-                },
-                'criterion':           'CrossEntropyLoss',
-                'disp_epoch':          True,
-                'disp_loss_epoch':     False,
-                'disp_time_per_epoch': True, 
-                'disp_loss_final':     True,
-                'disp_accuracy_final': True
-            }
-            influence_GT_params = {
-                'type':                'batch', # batch or representative
-                'training_iterations': train_params['total_epochs'],
-                'class_normalize' :    False,
-                'remove_negatives' :   False,
-                'clipping' :           False,
-                'intraclass_only' :    True,
-                'negative_clipping':   False,
-                'clip_outliers':       False,
-                'dtype':               np.float32,
-            }
-            influence_GT_train_params = {
-                'optimizer':           'SGD',
-                'scheduler': {
-                    'name':            'StepLR',
-                    'step_size':       999,
-                    'gamma':           0.3
-                },
-                'init_rate':           0.05,
-                'total_epochs':        40,
-                'weight_decay':        0,
-                'criterion':           'CrossEntropyLoss',
-                'disp_epoch':          False,
-                'disp_loss_epoch':     True,
-                'disp_time_per_batch': True,
-                'disp_total_time':     True,
-            }
-            model_params = {
-                'type':                ResNet if 'ResNet' in model_name else CNN,
-                'name':                model_name,
-                'in_channels':         1,
-                'num_classes':         10,
-                'img_size':            img_size,
-                'batchnorm':           True,
-                'fine_tune':           'NEW_LAYERS',
-            }
-            
-            # -------------- Customize arguments based on dataset --------------
-            if dataset == 'MNIST' or dataset == 'FashionMNIST':
-                model_params['in_channels'] = 1
-                model_params['num_classes'] = 10
-            
-            elif dataset == 'CIFAR10':
-                model_params['in_channels'] = 3
-                model_params['num_classes'] = 10
-            
-            elif dataset == 'Flowers102':
-                model_params['in_channels'] = 3
-                model_params['num_classes'] = 102
+    logger.log("Running experiment using dataset:{}, with model_name: {}...".format(dataset, model_name), level=1)
 
-            elif dataset == 'FGVCAircraft':
-                model_params['in_channels'] = 3
-                model_params['num_classes'] = 100
+    loader_params = {
+        'dataset_name':        dataset,
+        'conversion':          'none',
+        'root_folder':         root_folder,
+        'training_size':       'full', # 'full'
+        'batch_size':          400,
+        'IG_batch_size':       1000, 
+        'transform':           None,
+        'add_singleton':       False,
+        'convert_to_torch':    False,
+        'num_workers':         num_workers,
+    }
+    train_params = {
+        'optimizer':           'Adam',
+        'scheduler':           {'name': None}, # 'step_size': 10, 'milestones':[10,20,30],'gamma':0.8, 'max_lr': 0.01}
+        'init_rate':           0.0005,
+        'total_epochs':        150,
+        'weight_decay':        0, 
+        'criterion':           'CrossEntropyLoss',
+        'disp_epoch':          False,
+        'disp_loss_epoch':     True,
+        'disp_time_per_epoch': True,
+        'disp_loss_final':     True, 
+        'disp_accuracy_final': True
+    }
+    model_params = {
+        'type':                ResNet if 'ResNet' in model_name else CNN,
+        'name':                model_name,
+        'in_channels':         1,
+        'num_classes':         10,
+        'img_size':            img_size,
+        'batchnorm':           True,
+        'fine_tune':           'NEW_LAYERS',
+        'snapshot_k':          15,
+    }
 
-
-            model = get_model_from_params(model_params)
-
-            image_size = (img_size, img_size)
-            trainloader, testloader, IG_trainloader = genloaders_vision(
-                loader_params,
-                labelnoise_params,
-                image_size=image_size,
-                logger=logger
-            )
-
-            logger.log("Dataloaders generated, starting influence computation for program_mode {}...".format(program_mode), level=1)
-
-            if save_mode == 'load':
-                IG_GT = influence_params['graph_type'](
-                        trainloader.dataset.inputs.shape[0],
-                        trainloader.dataset.labels.squeeze().cpu().numpy(),
-                        loader_params['batch_size'],
-                        influence_params
-                    )
-                graphmat = IG_GT.load_graph('IG-DB', loader_params['dataset_name'], 'latest')
-            else:
-                IG_GT = batch_influence_GT(
-                    model_params,
-                    trainloader,
-                    IG_trainloader,
-                    influence_GT_params,
-                    influence_GT_train_params,
-                    loader_params,
-                    config=config,
-                    logger=logger
-                )
-                graphmat = IG_GT.normgraph_mat
-                
-                mean_in_degree = np.mean(graphmat.max(axis=0))
-                logger.log("Mean In Degree: {}".format(mean_in_degree), level=1)
-                
-                new_model_params = {
-                    k: v.__name__ if isinstance(v, type) else v for k, v in model_params.items()
-                }
-                new_influence_params = {
-                    k: v.__name__ if isinstance(v, type) else v for k, v in influence_params.items()
-                }
-                params_dict = {
-                    'labelnoise_params': labelnoise_params,
-                    'loader_params':     loader_params,
-                    'influence_params':  new_influence_params,
-                    'train_params':      train_params,
-                    'model_params':      new_model_params,
-                    'mean_in_degree':    mean_in_degree, 
-                }
-
-                folder_name = os.path.join('Label noise', loader_params['dataset_name'])
-                if not os.path.exists(folder_name):
-                    os.makedirs(folder_name)
-
-                # Modify the filename
-                filename = os.path.join(folder_name, labelnoise_params['noise_type'] + str(labelnoise_params['noise_level']))
-                save_params_and_matrix(filename, params_dict, graphmat)
-        
-            #
-            if visualize:
-                save_path = os.path.join(
-                    dir_path,
-                    'Figures',
-                    loader_params['dataset_name'],
-                    labelnoise_params['noise_type'] + str(labelnoise_params['noise_level'])
-                )
-                vis_influencepairs(graphmat, trainloader.dataset.inputs, save_path, max_percentile = 1, num_pairs=25)
-                vis_influencepairs(graphmat, trainloader.dataset.inputs, save_path, min_percentile = 99, num_pairs=25)
+    # -------------- Customize arguments based on dataset --------------
+    if dataset == 'MNIST' or dataset == 'FashionMNIST':
+        model_params['in_channels'] = 1
+        model_params['num_classes'] = 10
     
-                vis_influencenodes(graphmat, trainloader.dataset.inputs, save_path, max_percentile = 3, num_nodes = 25)
-                vis_influencenodes(graphmat, trainloader.dataset.inputs, save_path, min_percentile = 97, num_nodes = 25) 
-            #
+    elif dataset == 'CIFAR10':
+        model_params['in_channels'] = 3
+        model_params['num_classes'] = 10
+    
+    elif dataset == 'Flowers102':
+        model_params['in_channels'] = 3
+        model_params['num_classes'] = 102
 
-            # -------------- Clean up after each noise_level --------------
-            logger.log("End experiment using noise_type:{}, with noise_level: {}.".format(noise_type, noise_level), level=1)
-            del model, trainloader, testloader, IG_trainloader
-            if 'model_IG' in locals(): del model_IG
-            if 'graphmat' in locals(): del graphmat
-            gc.collect()
-            torch.cuda.empty_cache()
+    elif dataset == 'FGVCAircraft':
+        model_params['in_channels'] = 3
+        model_params['num_classes'] = 100
 
+
+    model = get_model_from_params(model_params)
+
+    image_size = (img_size, img_size)
+    trainloader, testloader, IG_trainloader = genloaders_vision(
+        loader_params,
+        image_size=image_size,
+        logger=logger
+    )
+
+    logger.log("Dataloaders generated, starting training snapshot...", level=1)
+
+    model = model.to(device)
+    model = model.train()
+
+    # Snapshot dir to save data to
+    snapshot_dir = dataset + '_snapshots'
+    snapshot_k   = model_params['snapshot_k']
+    
+    if snapshot_dir is not None:
+        os.makedirs(snapshot_dir, exist_ok=True)
+
+    all_train_losses = []
+    for epoch in range(train_params['total_epochs']):
+        
+        if snapshot_dir is not None and (epoch) % snapshot_k == 0:
+            snapshot_path = os.path.join(snapshot_dir, f'model_epoch_{epoch + 1}.pt')
+            torch.save(model.state_dict(), snapshot_path)
+            logger.log(f"Snapshot saved: {snapshot_path}", level=1)
+
+        optimizer, scheduler, criterion = get_learning_config(model, train_params, config=config)
+
+        if train_params['disp_epoch'] == True and logger is not None:
+            logger.log("Running epoch {}...".format(epoch), level=1)
+        
+        train_loss = []
+        loss_weights = []
+
+        for inputs, labels, indices in trainloader:
+            inputs, labels = inputs.to(device), labels.to(device)
+
+            optimizer.zero_grad(set_to_none=True)
+
+            with torch.autocast(device_type=device):
+                allouts = model(inputs)
+                loss = criterion(allouts, labels.long())
+    
+            loss.backward()
+            train_loss.append(loss.item())
+            loss_weights.append(len(labels))
+            optimizer.step()
+            
+        scheduler.step()
+        all_train_losses.append(np.average(np.array(train_loss), weights=np.array(loss_weights)))
+        
+        if train_params['disp_loss_epoch'] == True and logger is not None:
+            logger.log("Training Loss: {}".format(all_train_losses[-1]), level=1)
+            logger.log("Accuracy: {}...".format(test_model(model, testloader)), level=1)
+            model = model.train()
+
+    if train_params['disp_accuracy_final'] == True and logger is not None:
+        logger.log("Accuracy: {}...".format(test_model(model, testloader)), level=1)
+
+    model = model.eval()
+
+    params_bundle = {
+        'model_params': model_params,
+        'train_params': train_params,
+        'loader_params': loader_params
+    }
+    # Save to pickle
+    with open(os.path.join(snapshot_dir, 'config_bundle.pkl'), 'wb') as handle:
+        pickle.dump(params_bundle, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+    logger.log("Saved config_bundle.pkl inside: {}".format(snapshot_dir), level=1)
+
+        
     # -------------- Stop logger listener cleanly, and cleanup --------------
-    logger.log("Main process done.", level=1)
+    logger.log("End experiment using dataset:{}, with model_name: {}...".format(dataset, model_name), level=1)
     logger.log("Shutting down logger listener...", level=1)
     log_queue.put(None)  # Sentinel to signal listener shutdown
     listener.join()
