@@ -35,7 +35,7 @@ from copy import deepcopy
 from torch.utils import data
 from torch.utils.data import ConcatDataset
 from torch.nn import functional as F
-from multiprocessing import Queue, Process
+# from multiprocessing import Queue, Process
 from PIL import Image
 
 from lib_train import *
@@ -284,8 +284,8 @@ DEVICE = None
 logger = None
 
 if __name__ == "__main__":
-    import torch.multiprocessing as mp
-    mp.set_start_method('spawn', force=True)
+    # import torch.multiprocessing as mp
+    # mp.set_start_method('spawn', force=True)
     
     ############################## Argument Parser ##############################
     parser = argparse.ArgumentParser(description="Run influence estimation with label noise")
@@ -349,7 +349,7 @@ if __name__ == "__main__":
                 'root_folder':      root_folder,
                 'training_size':    'full', # 'full'
                 'batch_size':       10,   # 20-40
-                'IG_batch_size':    1000, 
+                'IG_batch_size':    800, 
                 'transform':        None,
                 'add_singleton':    False,
                 'convert_to_torch': False,
@@ -373,7 +373,7 @@ if __name__ == "__main__":
             train_params = {
                 'optimizer':           'Adam',
                 'init_rate':           1e-3,
-                'total_epochs':        10,
+                'total_epochs':        0,
                 'weight_decay':        1e-4,
                 'scheduler': {
                     'name':            'StepLR',

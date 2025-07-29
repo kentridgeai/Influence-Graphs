@@ -57,35 +57,49 @@ class InfluenceGraphv5: # 2nd order approaches (Correlation Based)
         
     def update_normalized_graph(self):
         eps = 1e-12
-        L, C  = self.lossmult_data, self.count_data.astype(float)
-        P, P2 = self.passive_data, self.passive_sq_data
-        A, A2 = self.active_data, self.active_sq_data
+        shape = (self.n_blocks, self.max_B, self.max_B)
+        corr_data = np.zeros(shape, dtype=np.float32)  # Placeholder for computed correlations
 
-        invC = 1.0 / (2*C+eps)
-        N    = L * invC
-        P    = P * invC;  P2 = P2 * invC
-        A    = A * invC;  A2 = A2 * invC
+        # Loop over each block
+        for b in range(self.n_blocks):
+            print(b)
+            C = self.count_data[b].astype(float)
+            if np.all(C == 0):
+                continue  # Skip empty blocks
 
-        P_std = np.sqrt(np.maximum(P2 - P**2, eps))
-        A_std = np.sqrt(np.maximum(A2 - A**2, eps))
+            L  = self.lossmult_data[b]
+            P  = self.passive_data[b]
+            P2 = self.passive_sq_data[b]
+            A  = self.active_data[b]
+            A2 = self.active_sq_data[b]
 
-        corr = (N - (P * A)) / ((P_std * A_std))
-        corr[corr>=1] = 1
-        corr[corr<=-1] = -1
-        
-        self.norm_data = corr / np.sqrt(1.01 - corr**2)
-        
-        block_id, local_x, local_y = np.nonzero(C)
-        values = self.norm_data[block_id, local_x, local_y]
-        
-        # Step 3: Recover global coordinates
+            invC = 1.0 / (2 * C + eps)
+            N    = L * invC
+            P    = P * invC
+            P2   = P2 * invC
+            A    = A * invC
+            A2   = A2 * invC
+
+            P_std = np.sqrt(np.maximum(P2 - P**2, eps))
+            A_std = np.sqrt(np.maximum(A2 - A**2, eps))
+
+            corr = (N - (P * A)) / (P_std * A_std)
+            corr = np.clip(corr, -1, 1)
+            corr_data[b] = corr / np.sqrt(1.01 - corr**2)
+
+        # Gather non-zero entries
+        block_id, local_x, local_y = np.nonzero(self.count_data)
+        values = corr_data[block_id, local_x, local_y]
+
+        # Recover global coordinates
         row = self.inverse_lookup[block_id, local_x]
         col = self.inverse_lookup[block_id, local_y]
-        
-        # Step 5: Construct sparse matrix (COO → CSR)
-        N = len(self._block_id)  # total number of nodes
-        self.normgraph_mat = coo_matrix((values, (row, col)), shape=(N, N)).tocsr()
+        print(row.min(),row.max())
+        print(col.min(),col.max())
 
+        # Construct sparse matrix
+        N = len(self._block_id)
+        self.normgraph_mat = coo_matrix((values, (row, col)), shape=(N, N)).tocsr()
         return self.normgraph_mat
 
         
