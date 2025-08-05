@@ -29,3 +29,9 @@ Code using Python version 3.11.5
 > source influence_env/bin/activate
 - Start notebook as usual
 > python -m notebook
+- Running label noise experiment example (MNIST)
+> python main_vision_label_noise.py --dataset MNIST --model_name ShallowMNIST --noise_type symmetric --save_mode store --img_size 28 --log_verbosity 1
+- Running train snapshots generation (MNIST)
+> python main_vision_snapshot_train.py --dataset MNIST --model_name ShallowMNIST --img_size 28 --log_verbosity 1
+- Running batchwise influence estimation for snapshots (MNIST)
+> python main_vision_snapshot_BW.py --dataset MNIST
